@@ -1,0 +1,507 @@
+<h2>Filled Modal Mockups</h2>
+<p class="subtitle">These are closer to final UI: real field labels, values, actions, and edit/create states.</p>
+
+<style>
+  .mock-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.75fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .mock-panel {
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(20, 24, 31, 0.1);
+  }
+
+  .mock-panel + .mock-panel {
+    margin-top: 16px;
+  }
+
+  .mock-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+  }
+
+  .mock-title {
+    margin: 0;
+    color: #8b2635;
+    font-size: 20px;
+    line-height: 1.2;
+    font-weight: 800;
+  }
+
+  .mock-subtitle {
+    margin: 4px 0 0;
+    color: #6b7280;
+    font-size: 13px;
+  }
+
+  .icon-button {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #f2c5c5;
+    border-radius: 8px;
+    background: #fff1f2;
+    color: #b91c1c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+  }
+
+  .body {
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .form-section-real {
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 14px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .section-header h3 {
+    margin: 0;
+    color: #8b2635;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .help {
+    color: #6b7280;
+    font-size: 12px;
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .field-grid.three {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .field {
+    min-width: 0;
+  }
+
+  .field.full {
+    grid-column: 1 / -1;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .required {
+    color: #b91c1c;
+  }
+
+  .input,
+  .textarea,
+  .select {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    font-size: 14px;
+  }
+
+  .textarea {
+    min-height: 74px;
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+
+  .select {
+    justify-content: space-between;
+    background: #fbfbfc;
+  }
+
+  .select::after {
+    content: "⌄";
+    color: #6b7280;
+    font-weight: 800;
+  }
+
+  .input-muted {
+    color: #6b7280;
+  }
+
+  .select-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    gap: 8px;
+  }
+
+  .add-square {
+    width: 40px;
+    min-height: 40px;
+    border: 1px dashed #8b2635;
+    border-radius: 8px;
+    background: #fff;
+    color: #8b2635;
+    font-size: 20px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .recipe-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 5px 9px;
+    border: 1px solid #d7e3dc;
+    border-radius: 999px;
+    background: #f0f8f3;
+    color: #166534;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .tag span {
+    color: #6b7280;
+    font-weight: 800;
+  }
+
+  .money-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .metric {
+    padding: 10px;
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+  }
+
+  .metric-label {
+    display: block;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .metric-value {
+    display: block;
+    margin-top: 3px;
+    color: #111827;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .metric-value.good {
+    color: #15803d;
+  }
+
+  .advanced {
+    border: 1px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 11px 12px;
+    background: #fbfbfc;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .footer {
+    display: flex;
+    gap: 10px;
+    padding: 14px 18px 18px;
+    border-top: 1px solid #edf0f2;
+  }
+
+  .button {
+    min-height: 40px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .button.secondary {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #374151;
+  }
+
+  .button.primary {
+    flex: 1.2;
+    border: 1px solid #8b2635;
+    background: #8b2635;
+    color: #fff;
+  }
+
+  .button.danger {
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #b91c1c;
+  }
+
+  .package-card {
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .package-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .package-card h4 {
+    margin: 0;
+    font-size: 15px;
+    color: #111827;
+  }
+
+  .package-card p {
+    margin: 4px 0 0;
+    color: #6b7280;
+    font-size: 12px;
+  }
+
+  .small-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .small-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #374151;
+    font-weight: 800;
+  }
+
+  .api-note {
+    margin-top: 12px;
+    padding: 10px;
+    border-left: 4px solid #b45309;
+    border-radius: 7px;
+    background: #fff7ed;
+    color: #7c2d12;
+    font-size: 13px;
+  }
+
+  @media (max-width: 1060px) {
+    .mock-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .field-grid,
+    .field-grid.three,
+    .money-preview {
+      grid-template-columns: 1fr;
+    }
+
+    .footer {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<div class="mock-grid">
+  <div class="mock-panel" data-choice="product-modal" onclick="toggleSelect(this)">
+    <div class="mock-head">
+      <div>
+        <h3 class="mock-title">Edit Product</h3>
+        <p class="mock-subtitle">Umami · 100г · 1 recipe</p>
+      </div>
+      <button class="icon-button" title="Delete">×</button>
+    </div>
+
+    <div class="body">
+      <section class="form-section-real">
+        <div class="section-header">
+          <h3>Product</h3>
+          <span class="help">What customers see in orders</span>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label>Name <span class="required">*</span></label>
+            <div class="input">Umami</div>
+          </div>
+          <div class="field">
+            <label>Package <span class="required">*</span></label>
+            <div class="select-row">
+              <div class="select">100г</div>
+              <div class="add-square">+</div>
+            </div>
+          </div>
+          <div class="field full">
+            <label>Description <span class="required">*</span></label>
+            <div class="textarea">Rich umami flavor with a balanced salty-sweet profile.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section-real">
+        <div class="section-header">
+          <h3>Recipe</h3>
+          <span class="help">Used for production and cost context</span>
+        </div>
+        <div class="recipe-tags">
+          <div class="tag">Тест <span>×</span></div>
+          <div class="tag">+ Add recipe</div>
+        </div>
+      </section>
+
+      <section class="form-section-real">
+        <div class="section-header">
+          <h3>Price</h3>
+          <span class="help">Card preview updates instantly</span>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label>Price <span class="required">*</span></label>
+            <div class="input">100.00 RSD</div>
+          </div>
+          <div class="field">
+            <label>Cost <span class="required">*</span></label>
+            <div class="input">50.00 RSD</div>
+          </div>
+        </div>
+        <div class="money-preview">
+          <div class="metric">
+            <span class="metric-label">Profit</span>
+            <span class="metric-value good">50.00 RSD</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Margin</span>
+            <span class="metric-value good">50.0%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Package</span>
+            <span class="metric-value">100г</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="advanced">Optional: image URL, internal notes, and rarely used fields stay collapsed here.</div>
+    </div>
+
+    <div class="footer">
+      <div class="button danger">Delete</div>
+      <div class="button secondary">Cancel</div>
+      <div class="button primary">Save Product</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="mock-panel" data-choice="package-create" onclick="toggleSelect(this)">
+      <div class="mock-head">
+        <div>
+          <h3 class="mock-title">New Package</h3>
+          <p class="mock-subtitle">Available now: frontend + current API</p>
+        </div>
+      </div>
+      <div class="body">
+        <section class="form-section-real">
+          <div class="field">
+            <label>Package name <span class="required">*</span></label>
+            <div class="input input-muted">e.g. 100г, 250g pouch, Gift box</div>
+          </div>
+        </section>
+      </div>
+      <div class="footer">
+        <div class="button secondary">Cancel</div>
+        <div class="button primary">Create Package</div>
+      </div>
+    </div>
+
+    <div class="mock-panel" data-choice="package-edit" onclick="toggleSelect(this)">
+      <div class="mock-head">
+        <div>
+          <h3 class="mock-title">Edit Package</h3>
+          <p class="mock-subtitle">Requires backend update endpoint</p>
+        </div>
+      </div>
+      <div class="body">
+        <div class="package-card">
+          <div class="package-card-head">
+            <div>
+              <h4>100г</h4>
+              <p>1 product: Umami</p>
+            </div>
+            <div class="small-actions">
+              <div class="small-button">✎</div>
+              <div class="small-button">×</div>
+            </div>
+          </div>
+        </div>
+        <div class="package-card">
+          <div class="package-card-head">
+            <div>
+              <h4>Упаковка</h4>
+              <p>1 product: Тестовый продукт</p>
+            </div>
+            <div class="small-actions">
+              <div class="small-button">✎</div>
+              <div class="small-button">×</div>
+            </div>
+          </div>
+        </div>
+        <div class="api-note">
+          Current backend only has GET/POST packages. Editing needs PUT/PATCH /api/packages/:id and delete needs usage rules.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

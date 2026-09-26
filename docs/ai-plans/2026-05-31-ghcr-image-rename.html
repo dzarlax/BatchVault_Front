@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BatchVault GHCR Image Rename Plan</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      color: #1f2933;
+      background: #f7f8fa;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+      background: #fff;
+    }
+    h1, h2 {
+      color: #111827;
+      line-height: 1.2;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 30px;
+    }
+    h2 {
+      margin-top: 32px;
+      padding-top: 18px;
+      border-top: 1px solid #d8dee9;
+      font-size: 20px;
+    }
+    code {
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: #eef2f7;
+      font-family: Consolas, monospace;
+      font-size: 0.95em;
+    }
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      border-radius: 6px;
+      background: #111827;
+      color: #f9fafb;
+    }
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    th, td {
+      padding: 9px 10px;
+      border: 1px solid #d8dee9;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef2f7;
+    }
+    .notice {
+      padding: 12px 14px;
+      border-left: 4px solid #b45309;
+      background: #fff7ed;
+    }
+    .approval {
+      padding: 14px 16px;
+      border: 2px solid #1f6feb;
+      border-radius: 6px;
+      background: #eff6ff;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>BatchVault GHCR Image Rename Plan</h1>
+  <p><strong>Created:</strong> 2026-05-31</p>
+  <p><strong>Scope:</strong> Rename production GHCR images for the BatchVault frontend and backend, and update deploy references to match.</p>
+
+  <h2>Task Summary</h2>
+  <p>
+    The GitHub repositories were renamed to <code>BatchVault_Front</code> and <code>BatchVault_Back</code>, but their
+    GitHub Actions workflows still publish Docker images under the old package names:
+    <code>ghcr.io/dzarlax/jerky-vault-frontend</code> and <code>ghcr.io/dzarlax/jerky-vault-back</code>.
+    This plan changes the canonical image names to BatchVault names and updates the live deploy compose file to pull them.
+  </p>
+
+  <h2>Current Behavior</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Current image</th>
+        <th>Source of truth</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Frontend workflow</td>
+        <td><code>ghcr.io/dzarlax/jerky-vault-frontend:latest</code></td>
+        <td><code>D:\Projects\Code\Personal\BatchVault\BatchVault_Front\.github\workflows\main.yml</code></td>
+      </tr>
+      <tr>
+        <td>Backend workflow</td>
+        <td><code>ghcr.io/dzarlax/jerky-vault-back:latest</code></td>
+        <td><code>D:\Projects\Code\Personal\BatchVault\BatchVault_Back\.github\workflows\main.yml</code></td>
+      </tr>
+      <tr>
+        <td>Live deploy compose</td>
+        <td>Pulls the same old image names</td>
+        <td><code>D:\Projects\Code\Personal\personal_ai_stack\deploy\jerkyvault\docker-compose.yaml</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Desired Behavior</h2>
+  <p>
+    After merge, pushes to <code>main</code> publish:
+  </p>
+  <ul>
+    <li><code>ghcr.io/dzarlax/batchvault-front:latest</code> and <code>ghcr.io/dzarlax/batchvault-front:${{ github.sha }}</code></li>
+    <li><code>ghcr.io/dzarlax/batchvault-back:latest</code> and <code>ghcr.io/dzarlax/batchvault-back:${{ github.sha }}</code></li>
+  </ul>
+  <p>
+    The live deploy compose should pull the new <code>batchvault-front</code> and <code>batchvault-back</code> images.
+  </p>
+
+  <h2>Assumptions</h2>
+  <ul>
+    <li>The target package names <code>batchvault-front</code> and <code>batchvault-back</code> are acceptable canonical GHCR names.</li>
+    <li>The repository owner remains <code>dzarlax</code>.</li>
+    <li>Deploy keeps the existing hostnames <code>admin.jerky.in.rs</code> and <code>api.jerky.in.rs</code>.</li>
+    <li>This pass does not rename Docker compose service names or Traefik router labels.</li>
+    <li>This pass does not deploy to the VPS unless explicitly approved after images exist.</li>
+  </ul>
+
+  <h2>Likely File Changes</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>D:\Projects\Code\Personal\BatchVault\BatchVault_Front\.github\workflows\main.yml</code></td>
+        <td>Replace frontend GHCR tags with <code>ghcr.io/dzarlax/batchvault-front</code>.</td>
+      </tr>
+      <tr>
+        <td><code>D:\Projects\Code\Personal\BatchVault\BatchVault_Back\.github\workflows\main.yml</code></td>
+        <td>Replace backend GHCR tags with <code>ghcr.io/dzarlax/batchvault-back</code>.</td>
+      </tr>
+      <tr>
+        <td><code>D:\Projects\Code\Personal\personal_ai_stack\deploy\jerkyvault\docker-compose.yaml</code></td>
+        <td>Update image references used by production deployment.</td>
+      </tr>
+      <tr>
+        <td><code>D:\Projects\Code\Personal\BatchVault\BatchVault_Front\docker-compose.yml.example</code>, <code>DOCKER.md</code></td>
+        <td>Update documented frontend image examples.</td>
+      </tr>
+      <tr>
+        <td><code>D:\Projects\Code\Personal\BatchVault\BatchVault_Back\README.md</code></td>
+        <td>Update documented backend image examples.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Implementation Steps</h2>
+  <ol>
+    <li>Change frontend workflow tags from <code>jerky-vault-frontend</code> to <code>batchvault-front</code>.</li>
+    <li>Change backend workflow tags from <code>jerky-vault-back</code> to <code>batchvault-back</code>.</li>
+    <li>Update production deploy compose image references to the new names.</li>
+    <li>Update non-historical docs and examples that users copy for deploys.</li>
+    <li>Leave historical <code>docs/ai-plans</code> references alone unless they are part of this new plan.</li>
+    <li>Run targeted grep checks to ensure active deploy/workflow files do not reference the old image names.</li>
+  </ol>
+
+  <h2>Test Plan</h2>
+  <ul>
+    <li>Run <code>rg -n "jerky-vault-frontend|jerky-vault-back" .github DOCKER.md docker-compose.yml.example README.md</code> in the frontend/backend repos as applicable.</li>
+    <li>Run <code>docker compose -f D:\Projects\Code\Personal\personal_ai_stack\deploy\jerkyvault\docker-compose.yaml config --services</code>.</li>
+    <li>After merge to <code>main</code>, verify GHCR packages with <code>docker manifest inspect ghcr.io/dzarlax/batchvault-front:latest</code> and <code>docker manifest inspect ghcr.io/dzarlax/batchvault-back:latest</code>.</li>
+  </ul>
+
+  <h2>Manual QA Checklist</h2>
+  <ul>
+    <li>Confirm GitHub Actions succeeded in both repositories after merge.</li>
+    <li>Confirm new GHCR packages are visible under the <code>dzarlax</code> account.</li>
+    <li>Before production deployment, confirm the VPS can pull both new private/public packages if visibility or permissions differ.</li>
+    <li>After production deployment, verify <code>https://admin.jerky.in.rs/</code> and <code>https://api.jerky.in.rs/swagger/index.html</code>.</li>
+  </ul>
+
+  <h2>Risks</h2>
+  <ul>
+    <li>If deploy compose is updated before the new packages are published, the next deploy pull can fail.</li>
+    <li>If GHCR package visibility differs from old packages, the VPS pull may require authentication changes.</li>
+    <li>Old rollback docs and operators may still reference old image names.</li>
+  </ul>
+
+  <h2>Rollback Plan</h2>
+  <ul>
+    <li>Restore workflow tags to <code>ghcr.io/dzarlax/jerky-vault-frontend</code> and <code>ghcr.io/dzarlax/jerky-vault-back</code>.</li>
+    <li>Restore deploy compose image references to old names.</li>
+    <li>Redeploy from the old <code>:latest</code> images or pin a known-good old SHA tag.</li>
+  </ul>
+
+  <h2>Open Questions</h2>
+  <ul>
+    <li>Should local image examples use <code>batchvault-front:local</code> and <code>batchvault-back:local</code> too, or only remote GHCR images?</li>
+    <li>Should old GHCR packages remain untouched for rollback history?</li>
+  </ul>
+
+  <h2>Approval Gate</h2>
+  <p class="approval">
+    Approval required before production code/config edits. Reply that the plan is approved to update workflows, deploy compose, and active docs.
+  </p>
+
+  <h2>Implementation Notes</h2>
+  <ul>
+    <li>Approved on 2026-05-31 and implemented without deploying to production.</li>
+    <li>Frontend workflow now publishes <code>ghcr.io/dzarlax/batchvault-front:latest</code> and <code>ghcr.io/dzarlax/batchvault-front:${{ github.sha }}</code>.</li>
+    <li>Backend workflow now publishes <code>ghcr.io/dzarlax/batchvault-back:latest</code> and <code>ghcr.io/dzarlax/batchvault-back:${{ github.sha }}</code>.</li>
+    <li>Production compose and copyable compose examples now reference the new GHCR image names.</li>
+    <li>Active README, Docker, AGENTS, CLAUDE, SECURITY, and handover docs were updated where they named old repositories or image tags.</li>
+  </ul>
+
+  <h2>Checks Run After Implementation</h2>
+  <ul>
+    <li><code>docker compose -f D:\Projects\Code\Personal\personal_ai_stack\deploy\jerkyvault\docker-compose.yaml config --services</code></li>
+    <li><code>docker compose -f D:\Projects\Code\Personal\BatchVault\BatchVault_Front\docker-compose.yml.example config --services</code></li>
+    <li><code>rg -n "jerky-vault-frontend|jerky-vault-back|jerky_vault_backend|jerky_vault_frontend" ...</code> over the backend, frontend, and deploy compose paths.</li>
+  </ul>
+
+  <h2>Known Limitations</h2>
+  <ul>
+    <li>No VPS deployment was performed in this change.</li>
+    <li>The new GHCR image tags will not exist until the updated workflows run on <code>main</code>.</li>
+    <li>Compose service names still use <code>jerky_vault_frontend</code> and <code>jerky_vault_backend</code>; they were left stable because this task only renames image packages.</li>
+    <li>Historical implementation plans may still mention old image and repository names as part of their original context.</li>
+  </ul>
+
+  <h2>Follow-up Recommendations</h2>
+  <ul>
+    <li>After both repos are merged to <code>main</code>, verify <code>docker manifest inspect ghcr.io/dzarlax/batchvault-front:latest</code> and <code>docker manifest inspect ghcr.io/dzarlax/batchvault-back:latest</code>.</li>
+    <li>Only then run the production pull/redeploy step for <code>personal_ai_stack/deploy/jerkyvault</code>.</li>
+  </ul>
+
+  <div class="notice">
+    <strong>Note:</strong> This plan intentionally does not include VPS deployment. Deployment should be a separate approved step after the new images are published.
+  </div>
+</main>
+</body>
+</html>

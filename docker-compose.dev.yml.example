@@ -9,14 +9,14 @@ services:
       FRONT_URL: "${BATCHVAULT_FRONTEND_URL:-http://127.0.0.1:3000}"
       JWT_SECRET: "${BATCHVAULT_JWT_SECRET:-local-dev-jwt-secret-change-me}"
     volumes:
-      - ${BATCHVAULT_BACKEND_CONTEXT:-../jerky-vault-back}:/app
+      - ${BATCHVAULT_BACKEND_CONTEXT:-../BatchVault_Back}:/app
       - batchvault_go_mod_cache:/go/pkg/mod
       - batchvault_go_build_cache:/root/.cache/go-build
     command: sh -c "go mod download && go run ."
 
   backend-image:
     build:
-      context: ${BATCHVAULT_BACKEND_CONTEXT:-../jerky-vault-back}
+      context: ${BATCHVAULT_BACKEND_CONTEXT:-../BatchVault_Back}
       dockerfile: Dockerfile
     profiles:
       - image

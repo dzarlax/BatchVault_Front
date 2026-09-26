@@ -7,18 +7,22 @@ interface WorkspaceContextType {
   workspaces: Workspace[];
   selectedWorkspaceId: string | null;
   selectedWorkspace: Workspace | null;
+  selectedCurrency: string | null;
   isWorkspaceReady: boolean;
   setSelectedWorkspaceId: (workspaceId: string) => void;
   refreshWorkspaces: () => Promise<void>;
+  updateSelectedWorkspace: (workspace: Workspace) => void;
 }
 
 const defaultWorkspaceContext: WorkspaceContextType = {
   workspaces: [],
   selectedWorkspaceId: null,
   selectedWorkspace: null,
+  selectedCurrency: null,
   isWorkspaceReady: false,
   setSelectedWorkspaceId: () => {},
   refreshWorkspaces: async () => {},
+  updateSelectedWorkspace: () => {},
 };
 
 const WorkspaceContext = createContext<WorkspaceContextType>(defaultWorkspaceContext);
@@ -55,9 +59,14 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceIdState] = useState<string | null>(null);
   const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
+  const [loadedForUserId, setLoadedForUserId] = useState<string | null>(null);
+  const [readyForUserId, setReadyForUserId] = useState<string | null>(null);
+  const requestVersion = React.useRef(0);
 
   const userIdValue = auth.user?.id || auth.user?.userID || getUserIdFromToken(auth.token);
   const userId = userIdValue ? String(userIdValue) : null;
+  const userIdRef = React.useRef(userId);
+  userIdRef.current = userId;
 
   const applyValidatedWorkspace = useCallback((availableWorkspaces: Workspace[]) => {
     if (!userId || typeof window === 'undefined') return;
@@ -80,57 +89,111 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [userId]);
 
   const refreshWorkspaces = useCallback(async () => {
+    const requestId = ++requestVersion.current;
     if (!auth.isAuthenticated || !userId) {
       setWorkspaces([]);
       setSelectedWorkspaceIdState(null);
       setIsWorkspaceReady(false);
+      setLoadedForUserId(null);
+      setReadyForUserId(null);
       clearWorkspaceValidation();
       return;
     }
 
-    setIsWorkspaceReady(false);
-    clearWorkspaceValidation();
-
     const availableWorkspaces = await fetcher('/api/workspaces');
-    setWorkspaces(availableWorkspaces || []);
-    applyValidatedWorkspace(availableWorkspaces || []);
-    setIsWorkspaceReady(true);
+    if (requestId !== requestVersion.current || userIdRef.current !== userId) return;
+    const nextWorkspaces: Workspace[] = availableWorkspaces || [];
+    setWorkspaces((current) => nextWorkspaces.map((workspace) => {
+      const previousWorkspaces = loadedForUserId === userId ? current : [];
+      const old = previousWorkspaces.find((item) => String(item.id) === String(workspace.id));
+      return workspace.currency ? workspace : { ...workspace, currency: old?.currency };
+    }));
+    setLoadedForUserId(userId);
+    applyValidatedWorkspace(nextWorkspaces);
+    const storedId = typeof window !== 'undefined' ? localStorage.getItem(selectedWorkspaceKey(userId)) : null;
+    if (storedId) {
+      try {
+        const currentWorkspace = await fetcher('/api/workspaces/current');
+        if (requestId === requestVersion.current && userIdRef.current === userId && String(currentWorkspace?.id) === storedId) {
+          setWorkspaces((current) => current.map((workspace) => String(workspace.id) === storedId
+            ? { ...workspace, ...currentWorkspace }
+            : workspace));
+        }
+      } catch {
+        // Older backend compatibility: currency is resolved by the RSD display fallback.
+      }
+    }
+    if (requestId === requestVersion.current && userIdRef.current === userId) {
+      setReadyForUserId(userId);
+      setIsWorkspaceReady(true);
+    }
   }, [applyValidatedWorkspace, auth.isAuthenticated, userId]);
 
   useEffect(() => {
     refreshWorkspaces().catch(() => {
-      setWorkspaces([]);
-      setSelectedWorkspaceIdState(null);
-      setIsWorkspaceReady(true);
-      clearWorkspaceValidation();
+      // Keep the last known workspace visible after transient refresh failures.
+      if (userIdRef.current === userId) setIsWorkspaceReady(true);
     });
-  }, [refreshWorkspaces]);
+  }, [refreshWorkspaces, userId]);
 
   const setSelectedWorkspaceId = useCallback((workspaceId: string) => {
-    if (!userId) return;
+    if (!auth.isAuthenticated || !userId || loadedForUserId !== userId) return;
 
     const workspaceExists = workspaces.some((workspace) => String(workspace.id) === workspaceId);
     if (!workspaceExists) return;
 
+    requestVersion.current += 1;
+
     localStorage.setItem(selectedWorkspaceKey(userId), workspaceId);
     setSelectedWorkspaceIdState(workspaceId);
     markWorkspaceValidated(userId);
-  }, [userId, workspaces]);
+    void refreshWorkspaces().catch(() => {
+      if (userIdRef.current === userId) {
+        setReadyForUserId(userId);
+        setIsWorkspaceReady(true);
+      }
+    });
+  }, [auth.isAuthenticated, userId, loadedForUserId, workspaces, refreshWorkspaces]);
 
+  const accountDataReady = auth.isAuthenticated && Boolean(userId) && loadedForUserId === userId;
+  const visibleWorkspaces = accountDataReady ? workspaces : [];
+  const visibleSelectedWorkspaceId = accountDataReady ? selectedWorkspaceId : null;
+  const visibleWorkspaceReady = accountDataReady && isWorkspaceReady && readyForUserId === userId;
   const selectedWorkspace = useMemo(
-    () => workspaces.find((workspace) => String(workspace.id) === selectedWorkspaceId) || null,
-    [selectedWorkspaceId, workspaces]
+    () => accountDataReady ? workspaces.find((workspace) => String(workspace.id) === selectedWorkspaceId) || null : null,
+    [accountDataReady, selectedWorkspaceId, workspaces]
   );
+
+  const updateSelectedWorkspace = useCallback((workspace: Workspace) => {
+    // A refresh started before this mutation may contain the old currency.
+    requestVersion.current += 1;
+    setWorkspaces((current) => current.map((item) => String(item.id) === String(workspace.id)
+      ? { ...item, ...workspace }
+      : item));
+  }, []);
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) return;
+    const refresh = () => { void refreshWorkspaces().catch(() => {}); };
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [auth.isAuthenticated, refreshWorkspaces]);
 
   return (
     <WorkspaceContext.Provider
       value={{
-        workspaces,
-        selectedWorkspaceId,
+        workspaces: visibleWorkspaces,
+        selectedWorkspaceId: visibleSelectedWorkspaceId,
         selectedWorkspace,
-        isWorkspaceReady,
+        selectedCurrency: visibleWorkspaceReady && selectedWorkspace ? (selectedWorkspace.currency || 'RSD') : null,
+        isWorkspaceReady: visibleWorkspaceReady,
         setSelectedWorkspaceId,
         refreshWorkspaces,
+        updateSelectedWorkspace,
       }}
     >
       {children}

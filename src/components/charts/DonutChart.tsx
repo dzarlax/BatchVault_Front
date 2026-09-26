@@ -14,6 +14,7 @@ interface DonutChartProps {
   showLegend?: boolean;
   centerText?: string;
   centerSubtext?: string;
+  currency?: string;
 }
 
 export const DonutChart: React.FC<DonutChartProps> = ({
@@ -23,6 +24,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
   showLegend = true,
   centerText,
   centerSubtext,
+  currency,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -113,7 +115,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
             </div>
             <div style="margin-top: 4px;">
               <span style="color: #9ca3af;">Значение:</span>
-              <span style="font-weight: 700; margin-left: 4px;">${d.data.value}</span>
+              <span style="font-weight: 700; margin-left: 4px;">${d.data.value}${currency ? ` ${currency}` : ''}</span>
             </div>
             <div style="margin-top: 2px;">
               <span style="color: #9ca3af;">Процент:</span>
@@ -224,7 +226,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
         tooltipRef.current = null;
       }
     };
-  }, [data, size, innerRadius, showLegend, centerText, centerSubtext]);
+  }, [data, size, innerRadius, showLegend, centerText, centerSubtext, currency]);
 
   if (data.length === 0) return null;
 

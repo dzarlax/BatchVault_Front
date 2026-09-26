@@ -11,4 +11,6 @@ export const workspaceKey = (
   return [endpoint, workspaceId];
 };
 
-export const workspaceFetcher = ([endpoint]: WorkspaceSWRKey) => fetcher(endpoint);
+export const workspaceFetcher = ([endpoint, workspaceId]: WorkspaceSWRKey) => fetcher(endpoint, {
+  headers: { 'X-Workspace-ID': workspaceId },
+});

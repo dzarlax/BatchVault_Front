@@ -40,7 +40,7 @@ services:
       - traefik
 
   jerky_vault_backend:
-    image: dzarlax/jerky_vault_backend:latest
+    image: ghcr.io/dzarlax/batchvault-back:latest
     ports:
       - "8080:8080"  # Port for backend
     environment:

@@ -1,0 +1,171 @@
+<style>
+  .option-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 22px;
+  }
+
+  .model-card {
+    border: 1px solid #e4d6ce;
+    background: #fffaf7;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .model-card.recommended {
+    border-color: #8b2635;
+    box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.12);
+  }
+
+  .model-head {
+    padding: 15px;
+    background: #fbf7f4;
+    border-bottom: 1px solid #eadfd8;
+  }
+
+  .model-head h3 {
+    margin: 0 0 6px;
+    color: #322622;
+  }
+
+  .model-head p {
+    margin: 0;
+    color: #725f58;
+    line-height: 1.45;
+  }
+
+  .model-body {
+    padding: 15px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .entity {
+    border: 1px solid #eadfd8;
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .entity strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 5px;
+  }
+
+  .entity span {
+    display: block;
+    color: #725f58;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .arrow {
+    text-align: center;
+    color: #8b2635;
+    font-weight: 900;
+  }
+
+  .pros-cons {
+    display: grid;
+    gap: 8px;
+  }
+
+  .line {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 8px;
+    align-items: start;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .plus {
+    color: #16756a;
+    font-weight: 900;
+  }
+
+  .minus {
+    color: #9d2d25;
+    font-weight: 900;
+  }
+
+  .tag {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 900;
+    background: rgba(139, 38, 53, 0.1);
+    color: #8b2635;
+    width: fit-content;
+  }
+
+  @media (max-width: 1120px) {
+    .option-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Backend развилка для “моих ингредиентов”</h2>
+<p class="subtitle">Чтобы не уйти в лишнюю сущность слишком рано, есть три рабочих варианта. Рекомендую B как явную, но контролируемую модель.</p>
+
+<div class="option-grid">
+  <div class="model-card">
+    <div class="model-head">
+      <h3>A. Выводить “мой набор” из фактов</h3>
+      <p>Не добавляем новую таблицу. Пользовательский набор = ингредиенты, у которых есть цены, рецепты или сессии пользователя.</p>
+    </div>
+    <div class="model-body">
+      <div class="entity"><strong>ingredients</strong><span>Общий справочник инсталляции</span></div>
+      <div class="arrow">+</div>
+      <div class="entity"><strong>prices / recipes</strong><span>По ним вычисляем, что пользователь использует</span></div>
+      <div class="pros-cons">
+        <div class="line"><span class="plus">+</span><span>Минимум backend-схемы.</span></div>
+        <div class="line"><span class="minus">-</span><span>Нельзя добавить ингредиент в набор до первой цены/рецепта.</span></div>
+        <div class="line"><span class="minus">-</span><span>Сложно архивировать и скрывать неактуальное.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="model-card recommended">
+    <div class="model-head">
+      <span class="tag">Recommended</span>
+      <h3>B. Явный рабочий набор</h3>
+      <p>Добавляем связку пользователя и справочного ингредиента. Это не новый ингредиент, а membership.</p>
+    </div>
+    <div class="model-body">
+      <div class="entity"><strong>ingredients</strong><span>Общий справочник инсталляции</span></div>
+      <div class="arrow">↕</div>
+      <div class="entity"><strong>user_ingredients</strong><span>user_id + ingredient_id + active/archived + optional alias</span></div>
+      <div class="arrow">↕</div>
+      <div class="entity"><strong>prices</strong><span>История цен пользователя для ingredient_id</span></div>
+      <div class="pros-cons">
+        <div class="line"><span class="plus">+</span><span>Чистый default view без чужих доменов.</span></div>
+        <div class="line"><span class="plus">+</span><span>Можно добавить в набор до первой цены.</span></div>
+        <div class="line"><span class="minus">-</span><span>Нужна миграция и новые endpoint’ы.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="model-card">
+    <div class="model-head">
+      <h3>C. Workspace/domain layer</h3>
+      <p>Заводим сущность бизнеса/пространства: мясное производство, кондитерка, тестовый workspace.</p>
+    </div>
+    <div class="model-body">
+      <div class="entity"><strong>workspaces</strong><span>Business/domain boundary внутри инсталляции</span></div>
+      <div class="arrow">↕</div>
+      <div class="entity"><strong>workspace_ingredients</strong><span>Набор ингредиентов конкретного workspace</span></div>
+      <div class="arrow">↕</div>
+      <div class="entity"><strong>prices</strong><span>Цены workspace или пользователя в workspace</span></div>
+      <div class="pros-cons">
+        <div class="line"><span class="plus">+</span><span>Самая правильная multi-tenant модель на будущее.</span></div>
+        <div class="line"><span class="minus">-</span><span>Сильно расширяет продукт: роли, доступы, миграции.</span></div>
+        <div class="line"><span class="minus">-</span><span>Слишком большой шаг для одного экрана.</span></div>
+      </div>
+    </div>
+  </div>
+</div>

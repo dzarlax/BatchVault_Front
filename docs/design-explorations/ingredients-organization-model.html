@@ -1,0 +1,189 @@
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 1.3fr 0.9fr;
+    gap: 22px;
+    margin-top: 22px;
+  }
+
+  .panel {
+    border: 1px solid #e4d6ce;
+    background: #fffaf7;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 16px 18px;
+    border-bottom: 1px solid #eadfd8;
+    background: #fbf7f4;
+  }
+
+  .panel-head h3 {
+    margin: 0 0 5px;
+    color: #322622;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #725f58;
+  }
+
+  .panel-body {
+    padding: 18px;
+  }
+
+  .diagram {
+    display: grid;
+    gap: 12px;
+  }
+
+  .entity {
+    border: 1px solid #eadfd8;
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .entity.primary {
+    border-color: rgba(139, 38, 53, 0.35);
+    background: rgba(139, 38, 53, 0.05);
+  }
+
+  .entity strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 5px;
+  }
+
+  .entity span {
+    color: #725f58;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .arrow {
+    text-align: center;
+    color: #8b2635;
+    font-weight: 900;
+  }
+
+  .decision-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .decision-marker {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(139, 38, 53, 0.1);
+    color: #8b2635;
+    font-weight: 900;
+  }
+
+  .decision strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 2px;
+  }
+
+  .decision span {
+    color: #725f58;
+    line-height: 1.45;
+  }
+
+  .tag {
+    display: inline-flex;
+    width: fit-content;
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 900;
+    background: rgba(139, 38, 53, 0.1);
+    color: #8b2635;
+    margin-bottom: 10px;
+  }
+
+  @media (max-width: 1000px) {
+    .layout,
+    .split {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Если продукт вырастет: рабочее пространство вместо “моих ингредиентов”</h2>
+<p class="subtitle">Чтобы не запереться в персональной модели, рабочий набор ингредиентов лучше проектировать как принадлежность workspace/company, а не напрямую user.</p>
+
+<div class="layout">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Целевая модель</h3>
+      <p>Пользователь работает в контексте workspace. Ингредиенты в справочнике общие для инсталляции, но рабочий набор и цены принадлежат workspace.</p>
+    </div>
+    <div class="panel-body">
+      <div class="diagram">
+        <div class="split">
+          <div class="entity"><strong>users</strong><span>Люди, которые входят в систему.</span></div>
+          <div class="entity primary"><strong>workspaces / companies</strong><span>Мясная мастерская, кондитерка, тестовая кухня, команда.</span></div>
+        </div>
+        <div class="arrow">users join workspaces via roles</div>
+        <div class="entity"><strong>workspace_members</strong><span>user_id + workspace_id + role. Здесь решаются доступы, а не в ingredients.</span></div>
+        <div class="arrow">workspace owns working set</div>
+        <div class="entity primary"><strong>workspace_ingredients</strong><span>workspace_id + ingredient_id + active/archived + optional local name/category.</span></div>
+        <div class="arrow">working set references shared dictionary</div>
+        <div class="entity"><strong>ingredients</strong><span>Общий installation-wide справочник для дедупликации и переиспользования.</span></div>
+        <div class="arrow">prices are scoped to workspace</div>
+        <div class="entity primary"><strong>ingredient_prices</strong><span>workspace_id + ingredient_id + price + quantity + unit + date. История сохраняется.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Практичный путь</h3>
+      <p>Не обязательно сразу строить весь SaaS-слой, но имена и связи лучше выбрать так, чтобы не переезжать через месяц.</p>
+    </div>
+    <div class="panel-body">
+      <span class="tag">Recommendation</span>
+      <div class="decision-list">
+        <div class="decision">
+          <div class="decision-marker">1</div>
+          <div><strong>Не называем `user_ingredients`</strong><span>Лучше `workspace_ingredients` или `ingredient_memberships`. Даже если сейчас workspace = personal workspace пользователя.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">2</div>
+          <div><strong>Создаем personal workspace автоматически</strong><span>Для текущего продукта каждый user получает workspace по умолчанию. UI почти не усложняется.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">3</div>
+          <div><strong>Цены привязываем к workspace</strong><span>Иначе команда из двух людей не сможет иметь общий прайс-лист без дублирования.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">4</div>
+          <div><strong>Справочник остается общим</strong><span>Это предотвращает дубликаты между командами, но не засоряет рабочий список каждой команды.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">5</div>
+          <div><strong>Этапность</strong><span>План можно разбить: сначала schema/workspace default, потом ingredient screen, потом team UI/roles отдельно.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

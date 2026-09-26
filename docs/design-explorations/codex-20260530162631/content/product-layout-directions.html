@@ -1,0 +1,365 @@
+<h2>Products Screen Direction</h2>
+<p class="subtitle">Choose the product screen structure before we refine cards, package flow, and modals.</p>
+
+<style>
+  .bv-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .bv-card {
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #ffffff;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(20, 24, 31, 0.08);
+  }
+
+  .bv-card:hover {
+    border-color: #8b2635;
+  }
+
+  .bv-top {
+    height: 56px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+  }
+
+  .bv-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #27272a;
+  }
+
+  .bv-action {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #8b2635;
+  }
+
+  .bv-body {
+    padding: 12px;
+    min-height: 300px;
+  }
+
+  .bv-filter {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .bv-pill {
+    height: 24px;
+    flex: 1;
+    border-radius: 6px;
+    background: #eef0f3;
+  }
+
+  .bv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .bv-product {
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .bv-image {
+    height: 62px;
+    background: linear-gradient(135deg, #4b5563, #a93444);
+  }
+
+  .bv-lines {
+    padding: 8px;
+  }
+
+  .bv-line {
+    height: 8px;
+    border-radius: 8px;
+    background: #d9dde3;
+    margin-bottom: 6px;
+  }
+
+  .bv-line.short {
+    width: 58%;
+  }
+
+  .bv-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .bv-metric {
+    height: 24px;
+    border-radius: 6px;
+    background: #f3f5f7;
+  }
+
+  .bv-table-row {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr 0.7fr 0.7fr 28px;
+    gap: 8px;
+    align-items: center;
+    height: 38px;
+    border-bottom: 1px solid #edf0f2;
+  }
+
+  .bv-cell {
+    height: 10px;
+    border-radius: 8px;
+    background: #d9dde3;
+  }
+
+  .bv-cell.strong {
+    background: #8b2635;
+  }
+
+  .bv-side-layout {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .bv-packages {
+    border-right: 1px solid #e4e7eb;
+    padding-right: 10px;
+  }
+
+  .bv-package {
+    height: 34px;
+    border-radius: 8px;
+    background: #f0f1f3;
+    margin-bottom: 8px;
+  }
+
+  .bv-package.active {
+    background: #8b2635;
+  }
+
+  .bv-caption {
+    padding: 14px;
+    border-top: 1px solid #edf0f2;
+  }
+
+  .bv-caption h3 {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+  }
+
+  .bv-caption p {
+    margin: 0;
+    font-size: 13px;
+    color: #59606b;
+  }
+
+  @media (max-width: 980px) {
+    .bv-options {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="bv-options">
+  <div class="bv-card" data-choice="catalog" onclick="toggleSelect(this)">
+    <div class="bv-top">
+      <div class="bv-title">A. Catalog Cards</div>
+      <div class="bv-action"></div>
+    </div>
+    <div class="bv-body">
+      <div class="bv-filter">
+        <div class="bv-pill"></div>
+        <div class="bv-pill"></div>
+        <div class="bv-pill"></div>
+      </div>
+      <div class="bv-grid">
+        <div class="bv-product">
+          <div class="bv-image"></div>
+          <div class="bv-lines">
+            <div class="bv-line"></div>
+            <div class="bv-line short"></div>
+            <div class="bv-metrics">
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bv-product">
+          <div class="bv-image"></div>
+          <div class="bv-lines">
+            <div class="bv-line"></div>
+            <div class="bv-line short"></div>
+            <div class="bv-metrics">
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bv-product">
+          <div class="bv-image"></div>
+          <div class="bv-lines">
+            <div class="bv-line"></div>
+            <div class="bv-line short"></div>
+            <div class="bv-metrics">
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bv-product">
+          <div class="bv-image"></div>
+          <div class="bv-lines">
+            <div class="bv-line"></div>
+            <div class="bv-line short"></div>
+            <div class="bv-metrics">
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+              <div class="bv-metric"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bv-caption">
+      <h3>Visual catalog</h3>
+      <p>Best when product images, price, margin, and packaging should be scan-friendly at a glance.</p>
+    </div>
+  </div>
+
+  <div class="bv-card" data-choice="table" onclick="toggleSelect(this)">
+    <div class="bv-top">
+      <div class="bv-title">B. Operations Table</div>
+      <div class="bv-action"></div>
+    </div>
+    <div class="bv-body">
+      <div class="bv-filter">
+        <div class="bv-pill"></div>
+        <div class="bv-pill"></div>
+        <div class="bv-pill"></div>
+      </div>
+      <div class="bv-table-row">
+        <div class="bv-cell strong"></div>
+        <div class="bv-cell strong"></div>
+        <div class="bv-cell strong"></div>
+        <div class="bv-cell strong"></div>
+        <div class="bv-cell strong"></div>
+      </div>
+      <div class="bv-table-row">
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+      </div>
+      <div class="bv-table-row">
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+      </div>
+      <div class="bv-table-row">
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+      </div>
+      <div class="bv-table-row">
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+      </div>
+      <div class="bv-table-row">
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+        <div class="bv-cell"></div>
+      </div>
+    </div>
+    <div class="bv-caption">
+      <h3>Dense management</h3>
+      <p>Best when editing prices, costs, recipes, and package assignments quickly matters more than imagery.</p>
+    </div>
+  </div>
+
+  <div class="bv-card" data-choice="packages" onclick="toggleSelect(this)">
+    <div class="bv-top">
+      <div class="bv-title">C. Package Workbench</div>
+      <div class="bv-action"></div>
+    </div>
+    <div class="bv-body">
+      <div class="bv-side-layout">
+        <div class="bv-packages">
+          <div class="bv-package active"></div>
+          <div class="bv-package"></div>
+          <div class="bv-package"></div>
+          <div class="bv-package"></div>
+          <div class="bv-package"></div>
+        </div>
+        <div>
+          <div class="bv-filter">
+            <div class="bv-pill"></div>
+            <div class="bv-pill"></div>
+          </div>
+          <div class="bv-grid">
+            <div class="bv-product">
+              <div class="bv-image"></div>
+              <div class="bv-lines">
+                <div class="bv-line"></div>
+                <div class="bv-line short"></div>
+              </div>
+            </div>
+            <div class="bv-product">
+              <div class="bv-image"></div>
+              <div class="bv-lines">
+                <div class="bv-line"></div>
+                <div class="bv-line short"></div>
+              </div>
+            </div>
+            <div class="bv-product">
+              <div class="bv-image"></div>
+              <div class="bv-lines">
+                <div class="bv-line"></div>
+                <div class="bv-line short"></div>
+              </div>
+            </div>
+            <div class="bv-product">
+              <div class="bv-image"></div>
+              <div class="bv-lines">
+                <div class="bv-line"></div>
+                <div class="bv-line short"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bv-caption">
+      <h3>Packages first</h3>
+      <p>Best if packaging is a first-class workflow: create package, review products inside it, adjust product variants.</p>
+    </div>
+  </div>
+</div>

@@ -54,11 +54,11 @@ If you find any secrets in the repository:
 
 ### 5. Current Security Issues
 
-**FRONTEND** (jerky-vault):
+**FRONTEND** (BatchVault_Front):
 - ❌ Mapbox token exposed in docker-compose.yaml
 - ✅ Fixed: Use `${MAPBOX_ACCESS_TOKEN}` instead
 
-**BACKEND** (jerky-vault-back):
+**BACKEND** (BatchVault_Back):
 - ❌ JWT_SECRET exposed in docker-compose.yaml
 - ❌ DATABASE_URL with credentials exposed in docker-compose.yaml
 - ✅ Fixed: Create `.env` file with these values

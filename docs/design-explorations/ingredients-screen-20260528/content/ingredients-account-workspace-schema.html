@@ -1,0 +1,233 @@
+<style>
+  .schema-wrap {
+    display: grid;
+    grid-template-columns: 1.25fr 0.9fr;
+    gap: 22px;
+    margin-top: 22px;
+  }
+
+  .panel {
+    border: 1px solid #e4d6ce;
+    background: #fffaf7;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 16px 18px;
+    border-bottom: 1px solid #eadfd8;
+    background: #fbf7f4;
+  }
+
+  .panel-head h3 {
+    margin: 0 0 5px;
+    color: #322622;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #725f58;
+  }
+
+  .panel-body {
+    padding: 18px;
+  }
+
+  .diagram {
+    display: grid;
+    gap: 12px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .entity {
+    border: 1px solid #eadfd8;
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .entity.primary {
+    border-color: rgba(139, 38, 53, 0.36);
+    background: rgba(139, 38, 53, 0.06);
+  }
+
+  .entity.data {
+    border-color: rgba(201, 120, 69, 0.36);
+    background: rgba(201, 120, 69, 0.07);
+  }
+
+  .entity.shared {
+    border-color: rgba(34, 112, 147, 0.28);
+    background: rgba(34, 112, 147, 0.06);
+  }
+
+  .entity strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 5px;
+  }
+
+  .entity span {
+    color: #725f58;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  .arrow {
+    text-align: center;
+    color: #8b2635;
+    font-weight: 900;
+    font-size: 13px;
+  }
+
+  .stack {
+    display: grid;
+    gap: 10px;
+  }
+
+  .note-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .note {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .note-marker {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(139, 38, 53, 0.1);
+    color: #8b2635;
+    font-weight: 900;
+  }
+
+  .note strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 2px;
+  }
+
+  .note span {
+    color: #725f58;
+    line-height: 1.45;
+  }
+
+  @media (max-width: 1000px) {
+    .schema-wrap,
+    .row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Account → Workspace → Production data</h2>
+<p class="subtitle">Workspace - рабочий контекст. Account/company можно добавить сверху, не ломая ингредиенты, цены и рецепты.</p>
+
+<div class="schema-wrap">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Как связаны сущности</h3>
+      <p>Пользователь работает в выбранном workspace. Workspace может принадлежать account/company.</p>
+    </div>
+    <div class="panel-body">
+      <div class="diagram">
+        <div class="row">
+          <div class="entity primary">
+            <strong>Account / Company</strong>
+            <span>Владелец бизнеса: компания, команда, личный аккаунт. Может появиться позже.</span>
+          </div>
+          <div class="entity">
+            <strong>User</strong>
+            <span>Человек, который входит в систему. Сам user не должен быть главной data boundary.</span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="arrow">owns many</div>
+          <div class="arrow">joins through membership</div>
+        </div>
+
+        <div class="row">
+          <div class="entity primary">
+            <strong>Workspace</strong>
+            <span>Jerky production, Cakes, Test kitchen. Основная граница рабочих данных.</span>
+          </div>
+          <div class="entity">
+            <strong>WorkspaceMember</strong>
+            <span>user_id + workspace_id + role. Здесь живут доступы и роли.</span>
+          </div>
+        </div>
+
+        <div class="arrow">workspace owns operational data</div>
+
+        <div class="row">
+          <div class="stack">
+            <div class="entity data">
+              <strong>WorkspaceIngredients</strong>
+              <span>Рабочий набор ингредиентов workspace: active/archived, optional alias/category.</span>
+            </div>
+            <div class="entity data">
+              <strong>IngredientPrices</strong>
+              <span>История цен внутри workspace: ingredient_id, price, quantity, unit, date.</span>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="entity data">
+              <strong>Recipes / Products / Orders</strong>
+              <span>Постепенно переезжают с user_id на workspace_id.</span>
+            </div>
+            <div class="entity shared">
+              <strong>Ingredients</strong>
+              <span>Общий справочник инсталляции для дедупликации: name, type.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow">workspace ingredients reference shared ingredients</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Как это работает в UI</h3>
+      <p>В интерфейсе пользователь всегда находится в текущем workspace.</p>
+    </div>
+    <div class="panel-body">
+      <div class="note-list">
+        <div class="note">
+          <div class="note-marker">1</div>
+          <div><strong>Current workspace</strong><span>В шапке приложения появляется выбранный workspace. Все рабочие экраны фильтруются по нему.</span></div>
+        </div>
+        <div class="note">
+          <div class="note-marker">2</div>
+          <div><strong>Ingredients screen</strong><span>Показывает workspace ingredients, а не весь installation-wide справочник.</span></div>
+        </div>
+        <div class="note">
+          <div class="note-marker">3</div>
+          <div><strong>Add to workspace</strong><span>Сначала ищем в общем ingredients; если нашли - добавляем связь. Если нет - создаем ingredient и связь.</span></div>
+        </div>
+        <div class="note">
+          <div class="note-marker">4</div>
+          <div><strong>Prices</strong><span>Новая цена пишется в историю текущего workspace. Другая команда не видит эту цену.</span></div>
+        </div>
+        <div class="note">
+          <div class="note-marker">5</div>
+          <div><strong>Migration path</strong><span>Сейчас каждому user создается personal workspace. Позже workspace можно привязать к account/company.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

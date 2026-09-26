@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
 import useTranslation from 'next-translate/useTranslation';
@@ -20,11 +20,14 @@ import { ClearFiltersButton, FilterBar, SearchFilter } from '../components/filte
 
 const Recipes: React.FC = () => {
   const { auth } = useAuth();
-  const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
   const { t } = useTranslation('common');
   const { success, error: showError } = useNotification();
   const router = useRouter();
   const [recipes, setRecipes] = useState<any[]>([]);
+  const [recipesWorkspaceId, setRecipesWorkspaceId] = useState<string | null>(null);
+  const selectedWorkspaceIdRef = useRef(selectedWorkspaceId);
+  selectedWorkspaceIdRef.current = selectedWorkspaceId;
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterIngredient, setFilterIngredient] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -51,27 +54,30 @@ const Recipes: React.FC = () => {
   );
 
   useEffect(() => {
-    if (recipeNames && workspaceIngredients) {
+    if (!isWorkspaceReady || !selectedWorkspaceId) {
+      setIsLoading(true);
+      return;
+    }
+    if (filterIngredient) {
+      setIsLoading(true);
+      if (workspaceIngredients === undefined) return;
+      loadRecipes();
+    } else if (recipeNames !== undefined && workspaceIngredients !== undefined) {
+      setRecipes(recipeNames || []);
+      setRecipesWorkspaceId(selectedWorkspaceId);
       setIsLoading(false);
     }
-  }, [recipeNames, workspaceIngredients]);
-
-  useEffect(() => {
-    if (filterIngredient) {
-      loadRecipes();
-    } else {
-      setRecipes(recipeNames || []);
-    }
-  }, [filterIngredient, recipeNames]);
+  }, [filterIngredient, recipeNames, workspaceIngredients, selectedWorkspaceId, isWorkspaceReady]);
 
   const filteredRecipes = useMemo(() => {
+    if (!isWorkspaceReady || !selectedWorkspaceId || recipesWorkspaceId !== selectedWorkspaceId) return [];
     const normalizedSearch = searchTerm.trim().toLowerCase();
     if (!normalizedSearch) return recipes;
 
     return recipes.filter((recipe) =>
       String(recipe.name || '').toLowerCase().includes(normalizedSearch)
     );
-  }, [recipes, searchTerm]);
+  }, [isWorkspaceReady, recipesWorkspaceId, recipes, searchTerm, selectedWorkspaceId]);
 
   useEffect(() => {
     if (filteredRecipes.length === 0) {
@@ -86,6 +92,8 @@ const Recipes: React.FC = () => {
   }, [filteredRecipes, selectedRecipeId]);
 
   const loadRecipes = async () => {
+    const workspaceId = selectedWorkspaceId;
+    if (!workspaceId || !isWorkspaceReady) return;
     const query = new URLSearchParams();
     if (filterIngredient) query.append('ingredient_id', filterIngredient);
 
@@ -100,16 +108,22 @@ const Recipes: React.FC = () => {
         headers: {
           'Authorization': `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
+          'X-Workspace-ID': workspaceId,
         },
       });
 
-      if (response) {
+      if (response && selectedWorkspaceIdRef.current === workspaceId) {
         setRecipes(response);
+        setRecipesWorkspaceId(workspaceId);
+        setIsLoading(false);
       } else {
-        showError(t('failedToLoadRecipes'));
+        if (selectedWorkspaceIdRef.current === workspaceId) showError(t('failedToLoadRecipes'));
       }
     } catch (error) {
-      showError(t('failedToLoadRecipes'));
+      if (selectedWorkspaceIdRef.current === workspaceId) {
+        setIsLoading(false);
+        showError(t('failedToLoadRecipes'));
+      }
     }
   };
 
@@ -349,11 +363,11 @@ const Recipes: React.FC = () => {
 
   const formatCost = (value: any) => {
     if (isMissingCost(value)) {
-      return `N/A ${t('currency')}`;
+      return `N/A ${selectedCurrency || ''}`;
     }
 
     const numericValue = typeof value === 'number' ? value : parseFloat(value);
-    return `${numericValue.toFixed(2)} ${t('currency')}`;
+    return `${numericValue.toFixed(2)} ${selectedCurrency || ''}`;
   };
 
   const getMissingCostCount = (recipe: any) =>

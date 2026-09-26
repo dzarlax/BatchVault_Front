@@ -71,7 +71,7 @@ const Dashboard = () => {
   const { t } = useTranslation('common');
   const router = useRouter();
   const { auth } = useAuth();
-  const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
   const { success, error: showError } = useNotification();
 
   const { data: dashboardStats, error: dashboardError, mutate: mutateDashboardStats } = useSWR<DashboardStats>(
@@ -565,7 +565,7 @@ const Dashboard = () => {
               <Col xs={12} md={6} xxl={3}>
                 <MetricCard
                   title={t('totalRevenue')}
-                  value={`${profitData.total_revenue?.toFixed(0) || '0'} ${t('currency')}`}
+                  value={`${profitData.total_revenue?.toFixed(0) || '0'} ${selectedCurrency || ''}`}
                   icon={<FaArrowUp size={20} />}
                   iconVariant="success"
                 />
@@ -574,7 +574,7 @@ const Dashboard = () => {
               <Col xs={12} md={6} xxl={3}>
                 <MetricCard
                   title={t('totalCosts')}
-                  value={`${profitData.total_costs?.toFixed(0) || '0'} ${t('currency')}`}
+                  value={`${profitData.total_costs?.toFixed(0) || '0'} ${selectedCurrency || ''}`}
                   icon={<FaDollarSign size={20} />}
                   iconVariant="warning"
                 />
@@ -583,7 +583,7 @@ const Dashboard = () => {
               <Col xs={12} md={6} xxl={3}>
                 <MetricCard
                   title={t('totalProfit')}
-                  value={`${profitData.total_profit?.toFixed(0) || '0'} ${t('currency')}`}
+                  value={`${profitData.total_profit?.toFixed(0) || '0'} ${selectedCurrency || ''}`}
                   icon={<FaChartLine size={20} />}
                   iconVariant="success"
                 />
@@ -592,7 +592,7 @@ const Dashboard = () => {
               <Col xs={12} md={6} xxl={3}>
                 <MetricCard
                   title={`${t('profit')} / ${t('order').toLowerCase()}`}
-                  value={`${profitData.order_count > 0 ? (profitData.total_profit / profitData.order_count).toFixed(0) : '0'} ${t('currency')}`}
+                  value={`${profitData.order_count > 0 ? (profitData.total_profit / profitData.order_count).toFixed(0) : '0'} ${selectedCurrency || ''}`}
                   icon={<FaCheckCircle size={20} />}
                   iconVariant="info"
                 />
@@ -707,6 +707,7 @@ const Dashboard = () => {
                     showLegend={false}
                     centerText={`${profitData.total_revenue > 0 ? ((profitData.total_profit / profitData.total_revenue) * 100).toFixed(0) : '0'}%`}
                     centerSubtext={t('margin')}
+                    currency={selectedCurrency || ''}
                   />
                 ) : (
                   <div className="text-center py-4">
@@ -775,7 +776,7 @@ const Dashboard = () => {
                                 {isApiOrder 
                                   ? order.total_amount.toFixed(2)
                                   : ((order as any).items?.reduce((total: number, item: any) => total + (item.quantity * item.price), 0).toFixed(2) || '0.00')
-                                } {t('currency')}
+                                } {selectedCurrency || ''}
                               </td>
                               <td className="text-muted">
                                 {formatDate(isApiOrder ? (order as any).order_date : (order as any).created_at)}

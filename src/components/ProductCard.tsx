@@ -2,6 +2,7 @@ import React from 'react';
 import useTranslation from 'next-translate/useTranslation';
 import { FaEdit, FaBoxOpen, FaUtensils } from 'react-icons/fa';
 import { Product, ProductPackage, Recipe } from '../types/api';
+import { useWorkspace } from '../utils/workspaceContext';
 
 interface ProductCardProps {
   product: Product;
@@ -17,6 +18,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onEdit
 }) => {
   const { t } = useTranslation('common');
+  const { selectedCurrency } = useWorkspace();
 
   const packageName = product.package?.name || packages?.find(pkg => pkg.id === product.package_id)?.name || t('unknownPackage');
 
@@ -34,7 +36,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   const profit = product.price - product.cost;
   const profitMargin = product.price > 0 ? ((profit / product.price) * 100).toFixed(1) : '0';
-  const currency = t('currency');
+  const currency = selectedCurrency || '';
   const formatMoney = (value: number) => `${value.toFixed(2)} ${currency}`;
 
   return (

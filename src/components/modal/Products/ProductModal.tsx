@@ -4,6 +4,7 @@ import { FaTrash, FaSave, FaTimes, FaPlus, FaInfoCircle, FaTag, FaDollarSign, Fa
 import useTranslation from "next-translate/useTranslation";
 import PackageModal from "./PackageModal";
 import SelectDropdown from "../../SelectDropdown";
+import { useWorkspace } from '../../../utils/workspaceContext';
 
 interface ProductModalProps {
   show: boolean;
@@ -53,6 +54,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   packageOptions,
 }) => {
   const { t } = useTranslation("common");
+  const { selectedCurrency } = useWorkspace();
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   
@@ -230,7 +232,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     {t("price")} <span className="text-danger">*</span>
                   </Form.Label>
                   <InputGroup>
-                    <InputGroup.Text>{t('currency')}</InputGroup.Text>
+                    <InputGroup.Text>{selectedCurrency || ''}</InputGroup.Text>
                     <Form.Control
                       type="number"
                       value={price}
@@ -255,7 +257,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     {t("cost")} <span className="text-danger">*</span>
                   </Form.Label>
                   <InputGroup>
-                    <InputGroup.Text>{t('currency')}</InputGroup.Text>
+                    <InputGroup.Text>{selectedCurrency || ''}</InputGroup.Text>
                     <Form.Control
                       type="number"
                       value={cost}

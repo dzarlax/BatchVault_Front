@@ -1,0 +1,428 @@
+<h2>Detail Cards With Packaging</h2>
+<p class="subtitle">The selected direction is image-free detail cards. Now choose how prominent packaging should be.</p>
+
+<style>
+  .flow-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .flow {
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(20, 24, 31, 0.08);
+  }
+
+  .flow:hover {
+    border-color: #8b2635;
+  }
+
+  .flow-header {
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+  }
+
+  .flow-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #27272a;
+  }
+
+  .primary-button {
+    height: 28px;
+    width: 76px;
+    border-radius: 7px;
+    background: #8b2635;
+  }
+
+  .preview {
+    min-height: 390px;
+    padding: 12px;
+    background: #fbfbfc;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .field,
+  .mini-button,
+  .chip,
+  .line,
+  .metric,
+  .package-row,
+  .modal-field {
+    border-radius: 8px;
+    background: #eef0f3;
+  }
+
+  .field {
+    height: 30px;
+  }
+
+  .mini-button {
+    width: 34px;
+    height: 30px;
+    background: #e1e4e8;
+  }
+
+  .package-strip {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .chip {
+    height: 28px;
+    min-width: 76px;
+    border-radius: 999px;
+    border: 1px solid #dfe3e8;
+  }
+
+  .chip.active {
+    background: #8b2635;
+    border-color: #8b2635;
+  }
+
+  .chip.add {
+    min-width: 34px;
+    background: #fff;
+    border: 1px dashed #8b2635;
+  }
+
+  .cards {
+    display: grid;
+    gap: 9px;
+  }
+
+  .product-card {
+    border: 1px solid #e1e5ea;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px;
+  }
+
+  .topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .name {
+    height: 12px;
+    width: 42%;
+    border-radius: 999px;
+    background: #2f3338;
+  }
+
+  .package-pill {
+    height: 23px;
+    width: 88px;
+    border-radius: 999px;
+    background: #f0e3e5;
+    border: 1px solid #e1c1c7;
+  }
+
+  .line {
+    height: 8px;
+    margin-bottom: 6px;
+    background: #d8dde4;
+  }
+
+  .line.short {
+    width: 64%;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .metric {
+    height: 32px;
+    background: #f3f5f7;
+    border: 1px solid #e7eaee;
+  }
+
+  .metric.good {
+    background: #edf7f0;
+    border-color: #cbe8d2;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .package-panel {
+    border-right: 1px solid #e4e7eb;
+    padding-right: 9px;
+  }
+
+  .package-row {
+    height: 35px;
+    margin-bottom: 7px;
+    border: 1px solid #e1e5ea;
+  }
+
+  .package-row.active {
+    background: #8b2635;
+    border-color: #8b2635;
+  }
+
+  .package-row.add {
+    background: #fff;
+    border: 1px dashed #8b2635;
+  }
+
+  .modal-preview {
+    margin-top: 12px;
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 8px 22px rgba(20, 24, 31, 0.1);
+    overflow: hidden;
+  }
+
+  .modal-head {
+    height: 42px;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+  }
+
+  .modal-body {
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .modal-field {
+    height: 34px;
+  }
+
+  .package-combo {
+    display: grid;
+    grid-template-columns: 1fr 34px;
+    gap: 6px;
+  }
+
+  .caption {
+    padding: 14px;
+    border-top: 1px solid #edf0f2;
+  }
+
+  .caption h3 {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+  }
+
+  .caption p {
+    margin: 0;
+    font-size: 13px;
+    color: #59606b;
+  }
+
+  @media (max-width: 1080px) {
+    .flow-options {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="flow-options">
+  <div class="flow" data-choice="package-chips" onclick="toggleSelect(this)">
+    <div class="flow-header">
+      <div class="flow-title">A. Package Chips Above Cards</div>
+      <div class="primary-button"></div>
+    </div>
+    <div class="preview">
+      <div class="toolbar">
+        <div class="field"></div>
+        <div class="field"></div>
+        <div class="mini-button"></div>
+      </div>
+      <div class="package-strip">
+        <div class="chip active"></div>
+        <div class="chip"></div>
+        <div class="chip"></div>
+        <div class="chip"></div>
+        <div class="chip add"></div>
+      </div>
+      <div class="cards">
+        <div class="product-card">
+          <div class="topline">
+            <div class="name"></div>
+            <div class="package-pill"></div>
+          </div>
+          <div class="line"></div>
+          <div class="line short"></div>
+          <div class="metrics">
+            <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="topline">
+            <div class="name"></div>
+            <div class="package-pill"></div>
+          </div>
+          <div class="line"></div>
+          <div class="line short"></div>
+          <div class="metrics">
+            <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="topline">
+            <div class="name"></div>
+            <div class="package-pill"></div>
+          </div>
+          <div class="line"></div>
+          <div class="line short"></div>
+          <div class="metrics">
+            <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Recommended default</h3>
+      <p>Packaging is visible and fast to filter, but the screen stays simple. Add package is one small action near the package chips.</p>
+    </div>
+  </div>
+
+  <div class="flow" data-choice="package-panel" onclick="toggleSelect(this)">
+    <div class="flow-header">
+      <div class="flow-title">B. Package Panel</div>
+      <div class="primary-button"></div>
+    </div>
+    <div class="preview">
+      <div class="split">
+        <div class="package-panel">
+          <div class="package-row active"></div>
+          <div class="package-row"></div>
+          <div class="package-row"></div>
+          <div class="package-row"></div>
+          <div class="package-row"></div>
+          <div class="package-row add"></div>
+        </div>
+        <div>
+          <div class="toolbar" style="grid-template-columns: 1fr 1fr auto;">
+            <div class="field"></div>
+            <div class="field"></div>
+            <div class="mini-button"></div>
+          </div>
+          <div class="cards">
+            <div class="product-card">
+              <div class="topline">
+                <div class="name"></div>
+                <div class="package-pill"></div>
+              </div>
+              <div class="line"></div>
+              <div class="line short"></div>
+              <div class="metrics">
+                <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+              </div>
+            </div>
+            <div class="product-card">
+              <div class="topline">
+                <div class="name"></div>
+                <div class="package-pill"></div>
+              </div>
+              <div class="line"></div>
+              <div class="line short"></div>
+              <div class="metrics">
+                <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+              </div>
+            </div>
+            <div class="product-card">
+              <div class="topline">
+                <div class="name"></div>
+                <div class="package-pill"></div>
+              </div>
+              <div class="line"></div>
+              <div class="line short"></div>
+              <div class="metrics">
+                <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Stronger package management</h3>
+      <p>Good if package count is small and package switching is the main workflow. It costs horizontal space and needs a mobile fallback.</p>
+    </div>
+  </div>
+
+  <div class="flow" data-choice="modal-first" onclick="toggleSelect(this)">
+    <div class="flow-header">
+      <div class="flow-title">C. Product Modal Owns Package</div>
+      <div class="primary-button"></div>
+    </div>
+    <div class="preview">
+      <div class="toolbar">
+        <div class="field"></div>
+        <div class="field"></div>
+        <div class="mini-button"></div>
+      </div>
+      <div class="cards">
+        <div class="product-card">
+          <div class="topline">
+            <div class="name"></div>
+            <div class="package-pill"></div>
+          </div>
+          <div class="line"></div>
+          <div class="line short"></div>
+          <div class="metrics">
+            <div class="metric"></div><div class="metric"></div><div class="metric good"></div><div class="metric good"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-preview">
+        <div class="modal-head"></div>
+        <div class="modal-body">
+          <div class="modal-grid">
+            <div class="modal-field"></div>
+            <div class="modal-field"></div>
+          </div>
+          <div class="package-combo">
+            <div class="modal-field"></div>
+            <div class="modal-field" style="background:#8b2635;"></div>
+          </div>
+          <div class="modal-grid">
+            <div class="modal-field"></div>
+            <div class="modal-field"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Minimal page, stronger modal</h3>
+      <p>Packaging stays mostly inside create/edit product. This is lowest page complexity, but weaker for reviewing package coverage.</p>
+    </div>
+  </div>
+</div>

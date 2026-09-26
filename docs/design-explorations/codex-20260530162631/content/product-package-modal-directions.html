@@ -1,0 +1,383 @@
+<h2>Product And Package Modal Direction</h2>
+<p class="subtitle">Product create/edit is supported today. Package edit needs backend API work; package create is supported now.</p>
+
+<style>
+  .modal-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .direction {
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(20, 24, 31, 0.08);
+  }
+
+  .direction:hover {
+    border-color: #8b2635;
+  }
+
+  .direction-head {
+    padding: 12px 14px;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .direction-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #27272a;
+  }
+
+  .status-pill {
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: #edf7f0;
+    color: #166534;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .status-pill.warn {
+    background: #fff7ed;
+    color: #9a3412;
+  }
+
+  .preview {
+    min-height: 430px;
+    padding: 14px;
+    background: #fbfbfc;
+  }
+
+  .modal-shell {
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 10px 26px rgba(20, 24, 31, 0.1);
+  }
+
+  .modal-top {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+  }
+
+  .modal-title-line {
+    width: 132px;
+    height: 12px;
+    border-radius: 999px;
+    background: #2f3338;
+  }
+
+  .danger-dot,
+  .close-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .danger-dot { background: #fee2e2; }
+  .close-dot { background: #e5e7eb; }
+
+  .modal-body {
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .section {
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .section-title {
+    width: 86px;
+    height: 10px;
+    border-radius: 999px;
+    background: #8b2635;
+    margin-bottom: 10px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .field,
+  .textarea,
+  .select,
+  .metric {
+    border-radius: 7px;
+    background: #eef0f3;
+    border: 1px solid #dfe3e8;
+  }
+
+  .field,
+  .select {
+    height: 34px;
+  }
+
+  .textarea {
+    height: 58px;
+    margin-top: 8px;
+  }
+
+  .select-combo {
+    display: grid;
+    grid-template-columns: 1fr 34px;
+    gap: 6px;
+  }
+
+  .plus {
+    height: 34px;
+    border-radius: 7px;
+    background: #8b2635;
+  }
+
+  .footer {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .secondary,
+  .primary {
+    height: 34px;
+    flex: 1;
+    border-radius: 7px;
+  }
+
+  .secondary { background: #eef0f3; }
+  .primary { background: #8b2635; }
+
+  .package-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .package-row {
+    display: grid;
+    grid-template-columns: 1fr 32px;
+    gap: 8px;
+    align-items: center;
+    padding: 9px;
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .row-line {
+    height: 10px;
+    border-radius: 999px;
+    background: #2f3338;
+  }
+
+  .row-line.short {
+    width: 60%;
+    background: #d8dde4;
+    margin-top: 7px;
+  }
+
+  .edit-button {
+    height: 32px;
+    border-radius: 7px;
+    background: #f0e3e5;
+  }
+
+  .caption {
+    padding: 14px;
+    border-top: 1px solid #edf0f2;
+  }
+
+  .caption h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+  }
+
+  .caption p {
+    margin: 0;
+    color: #59606b;
+    font-size: 13px;
+  }
+
+  @media (max-width: 1080px) {
+    .modal-options {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="modal-options">
+  <div class="direction" data-choice="single-flow" onclick="toggleSelect(this)">
+    <div class="direction-head">
+      <div class="direction-title">A. Single Product Form</div>
+      <div class="status-pill">frontend only</div>
+    </div>
+    <div class="preview">
+      <div class="modal-shell">
+        <div class="modal-top">
+          <div class="modal-title-line"></div>
+          <div class="danger-dot"></div>
+        </div>
+        <div class="modal-body">
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="grid-2">
+              <div class="field"></div>
+              <div class="field"></div>
+            </div>
+            <div class="textarea"></div>
+          </div>
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="grid-2">
+              <div class="field"></div>
+              <div class="field"></div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="grid-2">
+              <div class="select-combo">
+                <div class="select"></div>
+                <div class="plus"></div>
+              </div>
+              <div class="select"></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="secondary"></div>
+          <div class="primary"></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Refine current modal</h3>
+      <p>Keep one product modal, but make it denser: image URL becomes secondary/optional, package + recipes stay in details, package create remains a nested small modal.</p>
+    </div>
+  </div>
+
+  <div class="direction" data-choice="guided-flow" onclick="toggleSelect(this)">
+    <div class="direction-head">
+      <div class="direction-title">B. Guided Product Flow</div>
+      <div class="status-pill">frontend only</div>
+    </div>
+    <div class="preview">
+      <div class="modal-shell">
+        <div class="modal-top">
+          <div class="modal-title-line"></div>
+          <div class="close-dot"></div>
+        </div>
+        <div class="modal-body">
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="grid-2">
+              <div class="field"></div>
+              <div class="field"></div>
+            </div>
+            <div class="textarea"></div>
+          </div>
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="select-combo">
+              <div class="select"></div>
+              <div class="plus"></div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="select"></div>
+          </div>
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="grid-2">
+              <div class="metric"></div>
+              <div class="metric"></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="secondary"></div>
+          <div class="primary"></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Operational order</h3>
+      <p>Fields follow the user's decision order: identity, package, recipes, then price/cost. Better for creation; slightly more scrolling for edits.</p>
+    </div>
+  </div>
+
+  <div class="direction" data-choice="package-manager" onclick="toggleSelect(this)">
+    <div class="direction-head">
+      <div class="direction-title">C. Package Manager</div>
+      <div class="status-pill warn">API required</div>
+    </div>
+    <div class="preview">
+      <div class="modal-shell">
+        <div class="modal-top">
+          <div class="modal-title-line"></div>
+          <div class="close-dot"></div>
+        </div>
+        <div class="modal-body">
+          <div class="section">
+            <div class="section-title"></div>
+            <div class="select-combo">
+              <div class="field"></div>
+              <div class="plus"></div>
+            </div>
+          </div>
+          <div class="package-list">
+            <div class="package-row">
+              <div>
+                <div class="row-line"></div>
+                <div class="row-line short"></div>
+              </div>
+              <div class="edit-button"></div>
+            </div>
+            <div class="package-row">
+              <div>
+                <div class="row-line"></div>
+                <div class="row-line short"></div>
+              </div>
+              <div class="edit-button"></div>
+            </div>
+            <div class="package-row">
+              <div>
+                <div class="row-line"></div>
+                <div class="row-line short"></div>
+              </div>
+              <div class="edit-button"></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="secondary"></div>
+          <div class="primary"></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Create and edit packages</h3>
+      <p>Turns packaging into a real manager with edit actions. Requires backend routes such as PUT/PATCH /api/packages/:id and probably delete/usage rules.</p>
+    </div>
+  </div>
+</div>

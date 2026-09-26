@@ -1,0 +1,276 @@
+<style>
+  .map-layout {
+    display: grid;
+    grid-template-columns: 1.35fr 0.95fr;
+    gap: 22px;
+    margin-top: 22px;
+  }
+
+  .panel {
+    border: 1px solid #e4d6ce;
+    background: #fffaf7;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 16px 18px;
+    border-bottom: 1px solid #eadfd8;
+    background: #fbf7f4;
+  }
+
+  .panel-head h3 {
+    margin: 0 0 5px;
+    color: #322622;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #725f58;
+  }
+
+  .panel-body {
+    padding: 18px;
+  }
+
+  .swimlanes {
+    display: grid;
+    gap: 14px;
+  }
+
+  .lane {
+    border: 1px solid #eadfd8;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .lane-title {
+    padding: 10px 12px;
+    background: #fbf7f4;
+    border-bottom: 1px solid #eadfd8;
+    font-weight: 900;
+    color: #322622;
+  }
+
+  .entity-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .entity {
+    border: 1px solid #eee0d8;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    min-height: 86px;
+  }
+
+  .entity.shared {
+    border-color: rgba(34, 112, 147, 0.32);
+    background: rgba(34, 112, 147, 0.06);
+  }
+
+  .entity.workspace {
+    border-color: rgba(139, 38, 53, 0.34);
+    background: rgba(139, 38, 53, 0.05);
+  }
+
+  .entity.edge {
+    border-color: rgba(201, 120, 69, 0.36);
+    background: rgba(201, 120, 69, 0.07);
+  }
+
+  .entity strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
+
+  .entity span {
+    display: block;
+    color: #725f58;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .decision-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .decision-marker {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(139, 38, 53, 0.1);
+    color: #8b2635;
+    font-weight: 900;
+  }
+
+  .decision strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 2px;
+  }
+
+  .decision span {
+    color: #725f58;
+    line-height: 1.45;
+  }
+
+  .phase {
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    background: #fff;
+    padding: 11px;
+  }
+
+  .phase strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 4px;
+  }
+
+  .phase span {
+    color: #725f58;
+    line-height: 1.45;
+  }
+
+  .phase-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  @media (max-width: 1180px) {
+    .map-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 850px) {
+    .entity-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Workspace-модель для всех текущих сущностей</h2>
+<p class="subtitle">Цель: user больше не является главной границей production data. User получает доступ к workspace, а workspace владеет рабочими данными.</p>
+
+<div class="map-layout">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Куда переезжают сущности</h3>
+      <p>Синие - shared справочники, бордовые - workspace-owned, медные - связующие таблицы.</p>
+    </div>
+    <div class="panel-body">
+      <div class="swimlanes">
+        <div class="lane">
+          <div class="lane-title">Identity / Access</div>
+          <div class="entity-grid">
+            <div class="entity shared"><strong>users</strong><span>Остаются login identity.</span></div>
+            <div class="entity shared"><strong>accounts</strong><span>Company/billing owner. Можно добавить позже.</span></div>
+            <div class="entity edge"><strong>workspace_members</strong><span>user_id + workspace_id + role.</span></div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">Workspace boundary</div>
+          <div class="entity-grid">
+            <div class="entity workspace"><strong>workspaces</strong><span>Главная граница данных: personal, jerky, cakes, test.</span></div>
+            <div class="entity edge"><strong>workspace_ingredients</strong><span>Рабочий набор: active/archived, local alias/category.</span></div>
+            <div class="entity shared"><strong>ingredients</strong><span>Shared dictionary: name, type, dedupe.</span></div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">Production catalog</div>
+          <div class="entity-grid">
+            <div class="entity workspace"><strong>prices</strong><span>workspace_id + ingredient_id. История цен.</span></div>
+            <div class="entity workspace"><strong>recipes</strong><span>workspace_id вместо user_id.</span></div>
+            <div class="entity edge"><strong>recipe_ingredients</strong><span>recipe_id + ingredient_id. Через recipe попадает в workspace.</span></div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">Sales catalog</div>
+          <div class="entity-grid">
+            <div class="entity workspace"><strong>packages</strong><span>workspace_id вместо user_id.</span></div>
+            <div class="entity workspace"><strong>products</strong><span>workspace_id вместо user_id.</span></div>
+            <div class="entity edge"><strong>product_options</strong><span>product_id + recipe_id, both same workspace.</span></div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">Operations / CRM</div>
+          <div class="entity-grid">
+            <div class="entity workspace"><strong>clients</strong><span>workspace_id вместо user_id.</span></div>
+            <div class="entity workspace"><strong>orders</strong><span>workspace_id вместо user_id.</span></div>
+            <div class="entity edge"><strong>order_items</strong><span>order_id + product_id, both same workspace.</span></div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">Production runs</div>
+          <div class="entity-grid">
+            <div class="entity workspace"><strong>cooking_sessions</strong><span>workspace_id вместо user_id.</span></div>
+            <div class="entity edge"><strong>cooking_session_ingredients</strong><span>session_id + ingredient_id. Ingredient must be in workspace set.</span></div>
+            <div class="entity workspace"><strong>dashboard</strong><span>All analytics query by workspace_id.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Правила миграции</h3>
+      <p>Чтобы модель не расползалась, нужны жесткие инварианты.</p>
+    </div>
+    <div class="panel-body">
+      <div class="decision-list">
+        <div class="decision">
+          <div class="decision-marker">1</div>
+          <div><strong>User is identity, not data owner</strong><span>Новые production queries должны брать `workspace_id`, а не только `user_id`.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">2</div>
+          <div><strong>Workspace owns operational data</strong><span>Recipes, products, clients, orders, prices, packages, sessions живут в workspace.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">3</div>
+          <div><strong>Ingredient stays shared</strong><span>Сам ingredient остается справочником, но workspace решает, какие ingredients активны.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">4</div>
+          <div><strong>Cross-workspace references forbidden</strong><span>Product cannot reference recipe from another workspace; order cannot reference product from another workspace.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">5</div>
+          <div><strong>Personal workspace first</strong><span>Для текущих users создаем default workspace и переносим все user-owned records туда.</span></div>
+        </div>
+      </div>
+
+      <div class="phase-list">
+        <div class="phase"><strong>Phase 1: foundation</strong><span>Add workspaces, workspace_members, current workspace context, backfill one personal workspace per user.</span></div>
+        <div class="phase"><strong>Phase 2: migrate owner columns</strong><span>Add workspace_id to current user-owned tables, backfill from user_id, update controllers to enforce membership.</span></div>
+        <div class="phase"><strong>Phase 3: ingredient workbench</strong><span>Add workspace_ingredients, change ingredients screen to show workspace set, move prices to workspace scope.</span></div>
+        <div class="phase"><strong>Phase 4: account/company</strong><span>Add account ownership and team management UI when needed; personal workspaces can attach to accounts later.</span></div>
+      </div>
+    </div>
+  </div>
+</div>

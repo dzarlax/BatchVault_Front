@@ -3,6 +3,7 @@ import { Modal, Form, Button, Row, Col, Alert, InputGroup } from 'react-bootstra
 import useTranslation from 'next-translate/useTranslation';
 import { FaPlus, FaDollarSign, FaWeight, FaRulerCombined, FaTag } from 'react-icons/fa';
 import { WorkspaceIngredient } from '../../../types/api';
+import { useWorkspace } from '../../../utils/workspaceContext';
 import SelectDropdown from '../../../components/SelectDropdown';
 import {
   getWorkspaceIngredientLabel,
@@ -39,6 +40,7 @@ const AddPriceModal: React.FC<AddPriceModalProps> = ({
   workspaceIngredients = []
 }) => {
   const { t } = useTranslation('common');
+  const { selectedCurrency } = useWorkspace();
   const [ingredientId, setIngredientId] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -205,7 +207,7 @@ const AddPriceModal: React.FC<AddPriceModalProps> = ({
                   {t('price')} <span className="text-danger">*</span>
                 </Form.Label>
                 <InputGroup>
-                  <InputGroup.Text>{t('currency')}</InputGroup.Text>
+                  <InputGroup.Text>{selectedCurrency || ''}</InputGroup.Text>
                   <Form.Control
                     type="number"
                     step="0.01"

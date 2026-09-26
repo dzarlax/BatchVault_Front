@@ -1,0 +1,413 @@
+<style>
+  .detail-layout {
+    display: grid;
+    grid-template-columns: 1.5fr 0.9fr;
+    gap: 22px;
+    margin-top: 22px;
+  }
+
+  .panel {
+    border: 1px solid #e4d6ce;
+    background: #fffaf7;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 16px 18px;
+    border-bottom: 1px solid #eadfd8;
+    background: #fbf7f4;
+  }
+
+  .panel-head h3 {
+    margin: 0 0 5px;
+    color: #322622;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #725f58;
+  }
+
+  .panel-body {
+    padding: 18px;
+  }
+
+  .mock-page {
+    background: #ffffff;
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    padding: 16px;
+    color: #332724;
+  }
+
+  .mock-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mock-title {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .mock-subtitle {
+    margin: 5px 0 0;
+    color: #7c6962;
+    font-size: 13px;
+  }
+
+  .mock-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .mock-primary,
+  .mock-secondary {
+    border-radius: 7px;
+    padding: 9px 12px;
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .mock-primary {
+    border: 0;
+    background: #8b2635;
+    color: #fff;
+  }
+
+  .mock-secondary {
+    border: 1px solid #d7c8c0;
+    background: #fff;
+    color: #5c4b45;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0 12px;
+    border-bottom: 1px solid #eadfd8;
+  }
+
+  .tab {
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    color: #6b5a54;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .tab.active {
+    background: #fff;
+    border-color: #eadfd8;
+    color: #8b2635;
+  }
+
+  .mock-toolbar {
+    display: grid;
+    grid-template-columns: minmax(250px, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    background: #fbf7f4;
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .mock-field-label {
+    color: #7c6962;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .mock-input-box {
+    height: 34px;
+    border: 1px solid #d7c8c0;
+    background: #fff;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: #8b7a73;
+    font-size: 13px;
+  }
+
+  .filter-section {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .filter-line {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .axis-label {
+    color: #7c6962;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .mock-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .mock-chip {
+    border-radius: 999px;
+    border: 1px solid #eadfd8;
+    background: #fff;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #6b5a54;
+    font-weight: 700;
+  }
+
+  .mock-chip.active {
+    background: rgba(139, 38, 53, 0.1);
+    border-color: rgba(139, 38, 53, 0.24);
+    color: #8b2635;
+  }
+
+  .mock-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .mock-table th {
+    text-align: left;
+    color: #8c7971;
+    background: #f7f1ed;
+    padding: 10px 9px;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .mock-table td {
+    padding: 10px 9px;
+    border-bottom: 1px solid #f0e6e1;
+    vertical-align: middle;
+  }
+
+  .type-pill,
+  .status-pill {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .type-base { background: #ede7ff; color: #5742a6; }
+  .type-spice { background: #fff1d6; color: #9a5d11; }
+  .type-sauce { background: #ddf7f2; color: #16756a; }
+  .status-fresh { background: #ddf7f2; color: #16756a; }
+  .status-stale { background: #fff1d6; color: #9a5d11; }
+  .status-missing { background: #f8e0dd; color: #9d2d25; }
+
+  .muted {
+    color: #7c6962;
+  }
+
+  .row-action {
+    border: 1px solid #d7c8c0;
+    background: #fff;
+    color: #5c4b45;
+    border-radius: 7px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .decision-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .decision-marker {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(139, 38, 53, 0.1);
+    color: #8b2635;
+    font-weight: 900;
+  }
+
+  .decision strong {
+    display: block;
+    color: #322622;
+    margin-bottom: 2px;
+  }
+
+  .decision span {
+    color: #725f58;
+    line-height: 1.45;
+  }
+
+  @media (max-width: 1120px) {
+    .detail-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Вариант A, рабочий набор пользователя</h2>
+<p class="subtitle">Чтобы мясо и тортики не смешивались, пользователь по умолчанию работает не со всем installation-wide справочником, а со своим активным набором ингредиентов.</p>
+
+<div class="detail-layout">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Мои ингредиенты как основной экран</h3>
+      <p>Глобальный справочник не исчезает, но становится источником добавления в рабочий набор, а не основной таблицей.</p>
+    </div>
+    <div class="panel-body">
+      <div class="mock-page">
+        <div class="mock-title-row">
+          <div>
+            <p class="mock-title">Ингредиенты</p>
+            <p class="mock-subtitle">184 в моем наборе · 2 418 в справочнике инсталляции</p>
+          </div>
+          <div class="mock-actions">
+            <button class="mock-primary">+ Обновить цену</button>
+            <button class="mock-secondary">+ В мой набор</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">Мои ингредиенты</div>
+          <div class="tab">Справочник</div>
+          <div class="tab">Архив</div>
+        </div>
+
+        <div class="mock-toolbar">
+          <div>
+            <div class="mock-field-label">Поиск в моем наборе</div>
+            <div class="mock-input-box">Название ингредиента</div>
+          </div>
+          <button class="mock-secondary">Очистить</button>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-line">
+            <div class="axis-label">Тип</div>
+            <div class="mock-chip-row">
+              <span class="mock-chip active">Все типы</span>
+              <span class="mock-chip">База</span>
+              <span class="mock-chip">Специи</span>
+              <span class="mock-chip">Соусы</span>
+            </div>
+          </div>
+          <div class="filter-line">
+            <div class="axis-label">Цена</div>
+            <div class="mock-chip-row">
+              <span class="mock-chip active">Все цены</span>
+              <span class="mock-chip">Без цены</span>
+              <span class="mock-chip">Устаревшие</span>
+              <span class="mock-chip">Актуальные</span>
+            </div>
+          </div>
+        </div>
+
+        <table class="mock-table">
+          <thead>
+            <tr>
+              <th>Ингредиент</th>
+              <th>Тип</th>
+              <th>Цена</th>
+              <th>Состояние цены</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Говядина верхний круг</strong><br><span class="muted">в моем наборе</span></td>
+              <td><span class="type-pill type-base">База</span></td>
+              <td><strong>820 RSD / 1 kg</strong><br><span class="muted">28.05.2026 · 5 записей</span></td>
+              <td><span class="status-pill status-fresh">Актуальная</span></td>
+              <td><button class="row-action">Новая цена</button></td>
+            </tr>
+            <tr>
+              <td><strong>Копченая паприка</strong><br><span class="muted">в моем наборе</span></td>
+              <td><span class="type-pill type-spice">Специя</span></td>
+              <td><strong>18 RSD / 100 g</strong><br><span class="muted">03.04.2026 · 3 записи</span></td>
+              <td><span class="status-pill status-stale">Устарела</span></td>
+              <td><button class="row-action">Новая цена</button></td>
+            </tr>
+            <tr>
+              <td><strong>Вустерширский соус</strong><br><span class="muted">в моем наборе</span></td>
+              <td><span class="type-pill type-sauce">Соус</span></td>
+              <td><strong>7 RSD / 100 ml</strong><br><span class="muted">21.05.2026 · 8 записей</span></td>
+              <td><span class="status-pill status-fresh">Актуальная</span></td>
+              <td><button class="row-action">Новая цена</button></td>
+            </tr>
+            <tr>
+              <td><strong>Сушеный чеснок</strong><br><span class="muted">в моем наборе</span></td>
+              <td><span class="type-pill type-spice">Специя</span></td>
+              <td><span class="muted">Нет цены</span></td>
+              <td><span class="status-pill status-missing">Нет цены</span></td>
+              <td><button class="row-action">Добавить цену</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Новая продуктовая модель</h3>
+      <p>Это уже не просто косметика экрана, а защита разных пользователей от чужого домена.</p>
+    </div>
+    <div class="panel-body">
+      <div class="decision-list">
+        <div class="decision">
+          <div class="decision-marker">1</div>
+          <div><strong>Default = мой набор</strong><span>Мясной пользователь не видит ингредиенты кондитера в основном рабочем списке.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">2</div>
+          <div><strong>Справочник = источник</strong><span>Общий installation-wide каталог нужен для переиспользования и дедупликации, но не как default view.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">3</div>
+          <div><strong>Добавление меняет смысл</strong><span>`+ В мой набор` сначала ищет в справочнике. Если ингредиента нет, создает новый справочный ингредиент и сразу добавляет его пользователю.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">4</div>
+          <div><strong>Цена только в моем наборе</strong><span>Фильтры `без цены` и `устаревшие` работают только по ингредиентам, которые пользователь реально использует.</span></div>
+        </div>
+        <div class="decision">
+          <div class="decision-marker">5</div>
+          <div><strong>Архив вместо удаления</strong><span>Если пользователь перестал использовать ингредиент, он убирает его из рабочего набора, но справочник и история цен не ломаются.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
