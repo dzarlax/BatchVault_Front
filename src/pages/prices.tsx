@@ -41,7 +41,7 @@ const parsePositiveDecimal = (value: string) => {
 const Prices = () => {
   const { t, lang } = useTranslation('common');
   const { auth } = useAuth();
-  const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
   const { data: workspaceIngredients, error: ingredientsError } = useSWR<WorkspaceIngredient[]>(
     workspaceKey('/api/workspace-ingredients', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
@@ -330,7 +330,7 @@ const Prices = () => {
                   <IngredientTypeBadge type={price.ingredient.type} label={t(price.ingredient.type)} />
                 </td>
                 <td data-label={t('ingredientName')}>{price.ingredient.name}</td>
-                <td className="fw-semibold" data-label={t('price')}>{price.price} {t("currency")}</td>
+                <td className="fw-semibold" data-label={t('price')}>{price.price} {selectedCurrency || ''}</td>
                 <td data-label={t('quantity')}>{price.quantity}</td>
                 <td data-label={t('unit')}>{t(price.unit)}</td>
                 <td className="text-secondary small" data-label={t('date')}>

@@ -1,10 +1,10 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-**BatchVault Frontend** is a Next.js 14 web application for comprehensive management of small food production operations. It communicates with a separate Go backend API (`BatchVault_Back`) for all data operations.
+**JerkyVault Frontend** is a Next.js 14 web application for comprehensive management of jerky production operations. It communicates with a separate Go backend API (`BatchVault_Back`) for all data operations.
 
 **Architecture:**
 - **Frontend:** Next.js 14 with TypeScript, Pages Router (not App Router)

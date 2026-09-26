@@ -19,7 +19,7 @@ type PriceStateFilter = 'all' | 'missing' | 'priced';
 
 const Ingredients: React.FC = () => {
   const { auth } = useAuth();
-  const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
   const { data: workspaceIngredients, mutate } = useSWR<WorkspaceIngredient[]>(
     workspaceKey('/api/workspace-ingredients', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
@@ -223,7 +223,7 @@ const Ingredients: React.FC = () => {
                     {workspaceIngredient.latest_price ? (
                       <div className="text-secondary small">
                         <div>
-                          {workspaceIngredient.latest_price.price} {t('currency')} / {workspaceIngredient.latest_price.quantity} {t(workspaceIngredient.latest_price.unit)}
+                          {workspaceIngredient.latest_price.price} {selectedCurrency || ''} / {workspaceIngredient.latest_price.quantity} {t(workspaceIngredient.latest_price.unit)}
                         </div>
                         <div className="text-tertiary">
                           {t('latestPriceDate', {

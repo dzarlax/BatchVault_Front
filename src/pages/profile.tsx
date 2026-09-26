@@ -1,14 +1,118 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import fetcher from '../utils/fetcher';
 import useTranslation from 'next-translate/useTranslation';
 import { Form, Button, Alert, InputGroup } from 'react-bootstrap';
 import { useAuth, withAuth } from '../utils/authContext';
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaShieldAlt, FaCalendarAlt, FaIdCard, FaEnvelope } from 'react-icons/fa';
 import StatusBadge from '../components/StatusBadge';
+import SelectDropdown from '../components/SelectDropdown';
+import { useWorkspace } from '../utils/workspaceContext';
+import { useRouter } from 'next/router';
 
 const Profile = () => {
   const { t } = useTranslation('common');
   const { auth } = useAuth();
+  const router = useRouter();
+  const { selectedWorkspace, selectedWorkspaceId, isWorkspaceReady, updateSelectedWorkspace } = useWorkspace();
+  const [currencies, setCurrencies] = useState<Array<{ code: string; name: string }>>([]);
+  const [currencyLoading, setCurrencyLoading] = useState(false);
+  const [currencyError, setCurrencyError] = useState<string | null>(null);
+  const [currencySuccess, setCurrencySuccess] = useState(false);
+  const [pendingCurrency, setPendingCurrency] = useState<string | null>(null);
+  const [pendingCurrencyWorkspaceId, setPendingCurrencyWorkspaceId] = useState<string | null>(null);
+  const [currencyFeedbackWorkspaceId, setCurrencyFeedbackWorkspaceId] = useState<string | null>(null);
+  const [currencySavingWorkspaceId, setCurrencySavingWorkspaceId] = useState<string | null>(null);
+  const authUserId = auth.user?.id || auth.user?.userID || auth.user?.username || auth.token || null;
+  const baseWorkspaceKey = authUserId && selectedWorkspaceId ? `${authUserId}:${selectedWorkspaceId}` : null;
+  const selectionStateRef = useRef({ baseKey: baseWorkspaceKey, epoch: 0 });
+  if (selectionStateRef.current.baseKey !== baseWorkspaceKey) {
+    selectionStateRef.current = { baseKey: baseWorkspaceKey, epoch: selectionStateRef.current.epoch + 1 };
+  }
+  const selectedWorkspaceKey = baseWorkspaceKey ? `${baseWorkspaceKey}:${selectionStateRef.current.epoch}` : null;
+  const selectedWorkspaceKeyRef = useRef(selectedWorkspaceKey);
+  selectedWorkspaceKeyRef.current = selectedWorkspaceKey;
+  const selectedPendingCurrency = pendingCurrencyWorkspaceId === selectedWorkspaceKey ? pendingCurrency : null;
+  const selectedCurrencyError = currencyFeedbackWorkspaceId === selectedWorkspaceKey ? currencyError : null;
+  const selectedCurrencySuccess = currencyFeedbackWorkspaceId === selectedWorkspaceKey && currencySuccess;
+  const selectedCurrencySaving = selectedWorkspaceKey !== null && currencySavingWorkspaceId === selectedWorkspaceKey;
+
+  useEffect(() => {
+    if (!auth.isAuthenticated || !isWorkspaceReady) return;
+    let active = true;
+    const controller = new AbortController();
+    setCurrencyLoading(true);
+    fetcher('/api/currencies', { signal: controller.signal }).then((data) => {
+      if (active) setCurrencies(Array.isArray(data) ? data : []);
+    }).catch((err: any) => {
+      if (active) {
+        setCurrencyError(err?.message || t('requestFailed'));
+        setCurrencyFeedbackWorkspaceId(selectedWorkspaceKeyRef.current);
+      }
+    }).finally(() => { if (active) setCurrencyLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [auth.isAuthenticated, authUserId, isWorkspaceReady]);
+
+  useEffect(() => {
+    setPendingCurrency(null);
+    setPendingCurrencyWorkspaceId(null);
+    setCurrencyError(null);
+    setCurrencySuccess(false);
+    setCurrencyFeedbackWorkspaceId(null);
+  }, [selectedWorkspaceKey]);
+
+  const currencyOptions = useMemo(() => {
+    const locale = router.locale === 'rs' ? 'sr-RS' : (router.locale || 'en');
+    let names: Intl.DisplayNames | null = null;
+    try { names = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames([locale], { type: 'currency' }) : null; } catch { names = null; }
+    const optionFor = (code: string, name: string, isDisabled = false) => {
+      let localized = '';
+      try { localized = names?.of(code) || ''; } catch { /* unsupported code */ }
+      return { value: code, label: `${code} — ${localized && localized !== code ? localized : (name || code)}`, isDisabled };
+    };
+    const currentCode = selectedWorkspace?.currency;
+    if (!currentCode) return currencies.map(({ code, name }) => optionFor(code, name));
+    const current = currencies.find(({ code }) => code === currentCode);
+    return [
+      optionFor(currentCode, current?.name || currentCode, !current),
+      ...currencies.filter(({ code }) => code !== currentCode).map(({ code, name }) => optionFor(code, name)),
+    ];
+  }, [currencies, router.locale, selectedWorkspace?.currency]);
+
+  const handleCurrencySave = async () => {
+    if (!selectedWorkspace || !selectedWorkspaceId || !selectedWorkspaceKey || !selectedPendingCurrency) return;
+    if (typeof window !== 'undefined' && !window.confirm(t('currencyChangeConfirmation'))) return;
+    setCurrencyError(null);
+    setCurrencySuccess(false);
+    setCurrencyFeedbackWorkspaceId(selectedWorkspaceKey);
+    setCurrencySavingWorkspaceId(selectedWorkspaceKey);
+    try {
+      const updated = await fetcher('/api/workspaces/current', {
+        method: 'PATCH',
+        headers: { 'X-Workspace-ID': selectedWorkspaceId },
+        body: JSON.stringify({ currency: selectedPendingCurrency }),
+        ignoreForbiddenAuthError: true,
+      });
+      if (selectedWorkspaceKeyRef.current !== selectedWorkspaceKey) return;
+      updateSelectedWorkspace(updated);
+      setPendingCurrency(null);
+      setPendingCurrencyWorkspaceId(null);
+      setCurrencySuccess(true);
+      setCurrencyFeedbackWorkspaceId(selectedWorkspaceKey);
+    } catch (err: any) {
+      if (selectedWorkspaceKeyRef.current !== selectedWorkspaceKey) return;
+      const serverMessage = String(err?.message || '');
+      if (/disabled|not enabled|feature flag/i.test(serverMessage)) {
+        setCurrencyError(t('currencyFeatureDisabled'));
+      } else if (err?.status === 403) {
+        setCurrencyError(t('currencyOwnerOnly'));
+      } else {
+        setCurrencyError(serverMessage || t('requestFailed'));
+      }
+      setCurrencyFeedbackWorkspaceId(selectedWorkspaceKey);
+    } finally {
+      if (selectedWorkspaceKeyRef.current === selectedWorkspaceKey) setCurrencySavingWorkspaceId(null);
+    }
+  };
   
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -87,6 +191,32 @@ const Profile = () => {
 
       {/* Profile Content */}
       <div className="profile-grid">
+        {selectedWorkspace && (
+          <div className="profile-card">
+            <div className="profile-card-header"><h5 className="profile-card-title">{t('workspaceCurrency')}</h5></div>
+            <div className="profile-card-body">
+              <p className="fw-semibold">{selectedWorkspace.name}</p>
+              <p>{t('workspaceCurrencyExplanation')}</p>
+              {selectedWorkspace.role === 'owner' ? <><SelectDropdown
+                label={t('currencyLabel')}
+                options={currencyOptions}
+                value={currencyOptions.find((option) => option.value === (selectedPendingCurrency || selectedWorkspace.currency)) || null}
+                onChange={(option: { value: string } | null) => { setPendingCurrency(option?.value || null); setPendingCurrencyWorkspaceId(selectedWorkspaceKey); setCurrencySuccess(false); setCurrencyFeedbackWorkspaceId(selectedWorkspaceKey); }}
+                isSearchable
+                isClearable={false}
+                isLoading={currencyLoading}
+                isDisabled={currencyLoading || selectedCurrencySaving || !isWorkspaceReady}
+                placeholder={isWorkspaceReady ? (selectedWorkspace.currency || 'RSD') : `${t('loading')}...`}
+              />
+              <Button className="mt-3" onClick={handleCurrencySave} disabled={!selectedPendingCurrency || selectedPendingCurrency === selectedWorkspace.currency || selectedCurrencySaving}>
+                {selectedCurrencySaving ? t('saving') : t('saveCurrency')}
+              </Button>
+              {selectedCurrencyError && <Alert variant="danger" className="mt-3">{selectedCurrencyError}</Alert>}
+              {selectedCurrencySuccess && <Alert variant="success" className="mt-3">{t('currencySaved')}</Alert>}
+              </> : <div className="info-value">{isWorkspaceReady ? (selectedWorkspace.currency || 'RSD') : `${t('loading')}...`}</div>}
+            </div>
+          </div>
+        )}
         {/* Account Info Card */}
         <div className="profile-card">
           <div className="profile-card-header">

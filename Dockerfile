@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -29,7 +29,7 @@ ENV MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN
 RUN npm run build:no-ssg
 
 # Stage 2: Production runtime
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Set working directory
 WORKDIR /app

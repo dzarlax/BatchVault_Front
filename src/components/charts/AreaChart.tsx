@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import { useWorkspace } from '../../utils/workspaceContext';
 
 interface DataPoint {
   date: Date;
@@ -13,6 +14,7 @@ interface AreaChartProps {
   color?: string;
   showGrid?: boolean;
   showTooltip?: boolean;
+  currency?: string;
 }
 
 export const AreaChart: React.FC<AreaChartProps> = ({
@@ -22,7 +24,10 @@ export const AreaChart: React.FC<AreaChartProps> = ({
   color = '#8B2635',
   showGrid = true,
   showTooltip = true,
+  currency: currencyProp,
 }) => {
+  const { selectedCurrency } = useWorkspace();
+  const currency = currencyProp || selectedCurrency;
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -160,6 +165,7 @@ export const AreaChart: React.FC<AreaChartProps> = ({
               </div>
               <div style="font-size: 14px;">
                 ${d.value.toFixed(2)}
+                ${currency || ''}
               </div>
             `;
           }
@@ -171,7 +177,7 @@ export const AreaChart: React.FC<AreaChartProps> = ({
           }
         });
     }
-  }, [data, width, height, color, showGrid, showTooltip]);
+  }, [data, width, height, color, showGrid, showTooltip, currency]);
 
   if (data.length === 0) return null;
 

@@ -1,0 +1,475 @@
+<h2>Image-Free Product Catalog</h2>
+<p class="subtitle">These directions keep the catalog scannable without assuming product photos exist.</p>
+
+<style>
+  .screen-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .direction {
+    border: 1px solid #d8dce2;
+    border-radius: 10px;
+    background: #ffffff;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(20, 24, 31, 0.08);
+  }
+
+  .direction:hover {
+    border-color: #8b2635;
+  }
+
+  .direction-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: #f7f4f3;
+    border-bottom: 1px solid #e5e1df;
+  }
+
+  .direction-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #27272a;
+  }
+
+  .add-button {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #8b2635;
+    position: relative;
+  }
+
+  .add-button::before,
+  .add-button::after {
+    content: "";
+    position: absolute;
+    background: #fff;
+    border-radius: 2px;
+  }
+
+  .add-button::before {
+    width: 12px;
+    height: 2px;
+    top: 14px;
+    left: 9px;
+  }
+
+  .add-button::after {
+    width: 2px;
+    height: 12px;
+    top: 9px;
+    left: 14px;
+  }
+
+  .preview {
+    min-height: 360px;
+    padding: 12px;
+    background: #fbfbfc;
+  }
+
+  .filter-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .filter {
+    height: 28px;
+    border-radius: 7px;
+    background: #eef0f3;
+  }
+
+  .clear {
+    width: 38px;
+    height: 28px;
+    border-radius: 7px;
+    background: #e1e4e8;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .product-row-card {
+    border: 1px solid #e1e5ea;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px;
+  }
+
+  .card-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .name-line {
+    height: 12px;
+    width: 44%;
+    border-radius: 10px;
+    background: #2f3338;
+  }
+
+  .package-chip {
+    height: 22px;
+    width: 72px;
+    border-radius: 999px;
+    background: #f0e3e5;
+    border: 1px solid #e1c1c7;
+  }
+
+  .description-line {
+    height: 8px;
+    border-radius: 10px;
+    background: #d8dde4;
+    margin-bottom: 6px;
+  }
+
+  .description-line.short {
+    width: 62%;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .metric {
+    height: 34px;
+    border-radius: 7px;
+    background: #f3f5f7;
+    border: 1px solid #e7eaee;
+  }
+
+  .metric.good {
+    background: #edf7f0;
+    border-color: #cbe8d2;
+  }
+
+  .compact-list {
+    display: grid;
+    gap: 7px;
+  }
+
+  .compact-row {
+    display: grid;
+    grid-template-columns: 1.4fr 0.75fr 0.65fr 0.65fr 0.8fr 28px;
+    gap: 8px;
+    align-items: center;
+    height: 44px;
+    padding: 0 9px;
+    border: 1px solid #e1e5ea;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .cell {
+    height: 9px;
+    border-radius: 10px;
+    background: #d8dde4;
+  }
+
+  .cell.name {
+    background: #2f3338;
+  }
+
+  .cell.profit {
+    background: #4c9c63;
+  }
+
+  .edit-dot {
+    height: 24px;
+    border-radius: 7px;
+    background: #f0f1f3;
+  }
+
+  .package-layout {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .package-nav {
+    display: grid;
+    gap: 7px;
+    align-content: start;
+  }
+
+  .package-item {
+    height: 34px;
+    border-radius: 8px;
+    background: #f0f1f3;
+    border: 1px solid #e1e5ea;
+  }
+
+  .package-item.active {
+    background: #8b2635;
+    border-color: #8b2635;
+  }
+
+  .mini-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .mini-card {
+    min-height: 90px;
+    border: 1px solid #e1e5ea;
+    border-radius: 8px;
+    background: #fff;
+    padding: 9px;
+  }
+
+  .mini-name {
+    height: 11px;
+    width: 72%;
+    border-radius: 10px;
+    background: #2f3338;
+    margin-bottom: 9px;
+  }
+
+  .mini-chip {
+    height: 19px;
+    width: 58px;
+    border-radius: 999px;
+    background: #f0e3e5;
+    margin-bottom: 9px;
+  }
+
+  .mini-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+
+  .mini-metric {
+    height: 24px;
+    border-radius: 6px;
+    background: #f3f5f7;
+  }
+
+  .caption {
+    padding: 14px;
+    border-top: 1px solid #edf0f2;
+  }
+
+  .caption h3 {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+  }
+
+  .caption p {
+    margin: 0;
+    font-size: 13px;
+    color: #59606b;
+  }
+
+  @media (max-width: 1080px) {
+    .screen-options {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="screen-options">
+  <div class="direction" data-choice="detail-cards" onclick="toggleSelect(this)">
+    <div class="direction-header">
+      <div class="direction-title">A. Detail Cards</div>
+      <div class="add-button"></div>
+    </div>
+    <div class="preview">
+      <div class="filter-row">
+        <div class="filter"></div>
+        <div class="filter"></div>
+        <div class="filter"></div>
+        <div class="clear"></div>
+      </div>
+      <div class="cards">
+        <div class="product-row-card">
+          <div class="card-topline">
+            <div class="name-line"></div>
+            <div class="package-chip"></div>
+          </div>
+          <div class="description-line"></div>
+          <div class="description-line short"></div>
+          <div class="metric-grid">
+            <div class="metric"></div>
+            <div class="metric"></div>
+            <div class="metric good"></div>
+            <div class="metric good"></div>
+          </div>
+        </div>
+        <div class="product-row-card">
+          <div class="card-topline">
+            <div class="name-line"></div>
+            <div class="package-chip"></div>
+          </div>
+          <div class="description-line"></div>
+          <div class="description-line short"></div>
+          <div class="metric-grid">
+            <div class="metric"></div>
+            <div class="metric"></div>
+            <div class="metric good"></div>
+            <div class="metric good"></div>
+          </div>
+        </div>
+        <div class="product-row-card">
+          <div class="card-topline">
+            <div class="name-line"></div>
+            <div class="package-chip"></div>
+          </div>
+          <div class="description-line"></div>
+          <div class="description-line short"></div>
+          <div class="metric-grid">
+            <div class="metric"></div>
+            <div class="metric"></div>
+            <div class="metric good"></div>
+            <div class="metric good"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Card catalog without images</h3>
+      <p>Preserves the current approachable card model, but replaces image area with hierarchy, package chip, recipe summary, and financial metrics.</p>
+    </div>
+  </div>
+
+  <div class="direction" data-choice="compact-list" onclick="toggleSelect(this)">
+    <div class="direction-header">
+      <div class="direction-title">B. Compact List</div>
+      <div class="add-button"></div>
+    </div>
+    <div class="preview">
+      <div class="filter-row">
+        <div class="filter"></div>
+        <div class="filter"></div>
+        <div class="filter"></div>
+        <div class="clear"></div>
+      </div>
+      <div class="compact-list">
+        <div class="compact-row">
+          <div class="cell name"></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell profit"></div>
+          <div class="cell"></div>
+          <div class="edit-dot"></div>
+        </div>
+        <div class="compact-row">
+          <div class="cell name"></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell profit"></div>
+          <div class="cell"></div>
+          <div class="edit-dot"></div>
+        </div>
+        <div class="compact-row">
+          <div class="cell name"></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell profit"></div>
+          <div class="cell"></div>
+          <div class="edit-dot"></div>
+        </div>
+        <div class="compact-row">
+          <div class="cell name"></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell profit"></div>
+          <div class="cell"></div>
+          <div class="edit-dot"></div>
+        </div>
+        <div class="compact-row">
+          <div class="cell name"></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell profit"></div>
+          <div class="cell"></div>
+          <div class="edit-dot"></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Operational product list</h3>
+      <p>More rows on screen, stronger for repeated price and package maintenance. Less expressive for description and recipe context.</p>
+    </div>
+  </div>
+
+  <div class="direction" data-choice="package-board" onclick="toggleSelect(this)">
+    <div class="direction-header">
+      <div class="direction-title">C. Package Board</div>
+      <div class="add-button"></div>
+    </div>
+    <div class="preview">
+      <div class="package-layout">
+        <div class="package-nav">
+          <div class="package-item active"></div>
+          <div class="package-item"></div>
+          <div class="package-item"></div>
+          <div class="package-item"></div>
+          <div class="package-item"></div>
+          <div class="package-item"></div>
+        </div>
+        <div>
+          <div class="filter-row" style="grid-template-columns: 1fr 1fr auto;">
+            <div class="filter"></div>
+            <div class="filter"></div>
+            <div class="clear"></div>
+          </div>
+          <div class="mini-card-grid">
+            <div class="mini-card">
+              <div class="mini-name"></div>
+              <div class="mini-chip"></div>
+              <div class="mini-metrics">
+                <div class="mini-metric"></div>
+                <div class="mini-metric"></div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <div class="mini-name"></div>
+              <div class="mini-chip"></div>
+              <div class="mini-metrics">
+                <div class="mini-metric"></div>
+                <div class="mini-metric"></div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <div class="mini-name"></div>
+              <div class="mini-chip"></div>
+              <div class="mini-metrics">
+                <div class="mini-metric"></div>
+                <div class="mini-metric"></div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <div class="mini-name"></div>
+              <div class="mini-chip"></div>
+              <div class="mini-metrics">
+                <div class="mini-metric"></div>
+                <div class="mini-metric"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <h3>Packaging-centered board</h3>
+      <p>Makes packages first-class and image-free. Good if users think in weights or pack formats before individual product variants.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,490 @@
+<style>
+  .direction-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 22px;
+  }
+
+  .direction-card {
+    border: 1px solid #d9c7bd;
+    border-radius: 14px;
+    background: #fffaf7;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  }
+
+  .direction-card:hover {
+    transform: translateY(-2px);
+    border-color: #9f3546;
+    box-shadow: 0 14px 36px rgba(83, 38, 30, 0.14);
+  }
+
+  .direction-card.selected {
+    border-color: #8b2635;
+    box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.16), 0 14px 36px rgba(83, 38, 30, 0.16);
+  }
+
+  .mock-shell {
+    background: #f4eee9;
+    min-height: 430px;
+    padding: 14px;
+  }
+
+  .mock-page {
+    background: #ffffff;
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    padding: 14px;
+    min-height: 398px;
+    color: #332724;
+  }
+
+  .mock-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .mock-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .mock-subtitle {
+    margin: 3px 0 0;
+    color: #7c6962;
+    font-size: 11px;
+  }
+
+  .mock-primary {
+    border: 0;
+    background: #8b2635;
+    color: #fff;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-weight: 700;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .mock-toolbar {
+    display: grid;
+    grid-template-columns: 1.3fr 0.8fr auto;
+    gap: 8px;
+    align-items: end;
+    background: #fbf7f4;
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+
+  .mock-field-label {
+    color: #7c6962;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .mock-input-box {
+    height: 29px;
+    border: 1px solid #d7c8c0;
+    background: #fff;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: #8b7a73;
+    font-size: 11px;
+  }
+
+  .mock-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 11px;
+  }
+
+  .mock-chip {
+    border-radius: 999px;
+    border: 1px solid #eadfd8;
+    background: #fff;
+    padding: 5px 8px;
+    font-size: 10px;
+    color: #6b5a54;
+    font-weight: 700;
+  }
+
+  .mock-chip.active {
+    background: rgba(139, 38, 53, 0.1);
+    border-color: rgba(139, 38, 53, 0.24);
+    color: #8b2635;
+  }
+
+  .mock-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .mock-table th {
+    text-align: left;
+    color: #8c7971;
+    background: #f7f1ed;
+    padding: 8px 7px;
+    font-size: 9px;
+    text-transform: uppercase;
+  }
+
+  .mock-table td {
+    padding: 8px 7px;
+    border-bottom: 1px solid #f0e6e1;
+    vertical-align: middle;
+  }
+
+  .type-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    padding: 4px 7px;
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .type-base { background: #ede7ff; color: #5742a6; }
+  .type-spice { background: #fff1d6; color: #9a5d11; }
+  .type-sauce { background: #ddf7f2; color: #16756a; }
+
+  .mini-actions {
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+  }
+
+  .mini-icon {
+    width: 23px;
+    height: 23px;
+    border-radius: 6px;
+    border: 1px solid #eadfd8;
+    display: grid;
+    place-items: center;
+    color: #7c6962;
+    background: #fff;
+  }
+
+  .group-stack {
+    display: grid;
+    gap: 10px;
+  }
+
+  .group-panel {
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .group-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fbf7f4;
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .group-count {
+    color: #8b2635;
+    font-size: 10px;
+  }
+
+  .ingredient-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .ingredient-tile {
+    border: 1px solid #f0e6e1;
+    border-radius: 8px;
+    padding: 8px;
+    background: #fff;
+  }
+
+  .ingredient-tile strong {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+
+  .ingredient-tile span {
+    color: #7c6962;
+    font-size: 10px;
+  }
+
+  .ops-grid {
+    display: grid;
+    grid-template-columns: 0.9fr 1.4fr;
+    gap: 12px;
+  }
+
+  .ops-side {
+    display: grid;
+    gap: 8px;
+  }
+
+  .metric {
+    border: 1px solid #eadfd8;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fbf7f4;
+  }
+
+  .metric span {
+    display: block;
+    color: #7c6962;
+    font-size: 9px;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+
+  .metric strong {
+    display: block;
+    font-size: 18px;
+    margin-top: 3px;
+  }
+
+  .stock-low {
+    color: #b54708;
+    font-weight: 800;
+  }
+
+  .card-caption {
+    padding: 14px;
+    border-top: 1px solid #eadfd8;
+    background: #fff;
+  }
+
+  .card-caption h3 {
+    margin: 0 0 6px;
+    color: #332724;
+    font-size: 17px;
+  }
+
+  .card-caption p {
+    margin: 0;
+    color: #735f57;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  @media (max-width: 1180px) {
+    .direction-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Экран ингредиентов: выбери направление</h2>
+<p class="subtitle">Это не финальный пиксельный дизайн, а три разных UX-модели для обсуждения. Нажми на вариант в браузере или напиши в терминале, что нравится и что убрать.</p>
+
+<div class="direction-grid">
+  <div class="direction-card" data-choice="a-catalog-table" onclick="toggleSelect(this)">
+    <div class="mock-shell">
+      <div class="mock-page">
+        <div class="mock-title-row">
+          <div>
+            <p class="mock-title">Ингредиенты</p>
+            <p class="mock-subtitle">128 позиций / 42 отфильтровано</p>
+          </div>
+          <button class="mock-primary">+ Добавить</button>
+        </div>
+        <div class="mock-toolbar">
+          <div>
+            <div class="mock-field-label">Поиск</div>
+            <div class="mock-input-box">говядина, чили, соус...</div>
+          </div>
+          <div>
+            <div class="mock-field-label">Тип</div>
+            <div class="mock-input-box">Все типы</div>
+          </div>
+          <button class="mock-primary">Фильтр</button>
+        </div>
+        <div class="mock-chip-row">
+          <span class="mock-chip active">Все 128</span>
+          <span class="mock-chip">База 34</span>
+          <span class="mock-chip">Специи 71</span>
+          <span class="mock-chip">Соусы 23</span>
+        </div>
+        <table class="mock-table">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Тип</th>
+              <th>Ед.</th>
+              <th>Цена</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Говядина верхний круг</strong></td>
+              <td><span class="type-pill type-base">База</span></td>
+              <td>kg</td>
+              <td>820 RSD</td>
+              <td><div class="mini-actions"><span class="mini-icon">✎</span><span class="mini-icon">⋯</span></div></td>
+            </tr>
+            <tr>
+              <td><strong>Копченая паприка</strong></td>
+              <td><span class="type-pill type-spice">Специя</span></td>
+              <td>g</td>
+              <td>18 RSD</td>
+              <td><div class="mini-actions"><span class="mini-icon">✎</span><span class="mini-icon">⋯</span></div></td>
+            </tr>
+            <tr>
+              <td><strong>Вустерширский соус</strong></td>
+              <td><span class="type-pill type-sauce">Соус</span></td>
+              <td>ml</td>
+              <td>7 RSD</td>
+              <td><div class="mini-actions"><span class="mini-icon">✎</span><span class="mini-icon">⋯</span></div></td>
+            </tr>
+            <tr>
+              <td><strong>Черный перец</strong></td>
+              <td><span class="type-pill type-spice">Специя</span></td>
+              <td>g</td>
+              <td>12 RSD</td>
+              <td><div class="mini-actions"><span class="mini-icon">✎</span><span class="mini-icon">⋯</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card-caption">
+      <h3>A. Плотный каталог</h3>
+      <p>Самый практичный путь: оставить таблицу, но сделать ее полезной: быстрые чипы типов, сортировка, единицы, актуальная цена, действия в строке.</p>
+    </div>
+  </div>
+
+  <div class="direction-card" data-choice="b-grouped-inventory" onclick="toggleSelect(this)">
+    <div class="mock-shell">
+      <div class="mock-page">
+        <div class="mock-title-row">
+          <div>
+            <p class="mock-title">Ингредиенты</p>
+            <p class="mock-subtitle">Сгруппировано по типу для рецептов</p>
+          </div>
+          <button class="mock-primary">+ Добавить</button>
+        </div>
+        <div class="mock-toolbar" style="grid-template-columns:1fr auto">
+          <div>
+            <div class="mock-field-label">Поиск</div>
+            <div class="mock-input-box">найти ингредиент</div>
+          </div>
+          <button class="mock-primary">Очистить</button>
+        </div>
+        <div class="group-stack">
+          <div class="group-panel">
+            <div class="group-head"><span>Базовые ингредиенты</span><span class="group-count">34 позиции</span></div>
+            <div class="ingredient-list">
+              <div class="ingredient-tile"><strong>Говядина верхний круг</strong><span>kg · 820 RSD</span></div>
+              <div class="ingredient-tile"><strong>Индейка филе</strong><span>kg · 760 RSD</span></div>
+            </div>
+          </div>
+          <div class="group-panel">
+            <div class="group-head"><span>Специи</span><span class="group-count">71 позиция</span></div>
+            <div class="ingredient-list">
+              <div class="ingredient-tile"><strong>Копченая паприка</strong><span>g · 18 RSD</span></div>
+              <div class="ingredient-tile"><strong>Черный перец</strong><span>g · 12 RSD</span></div>
+              <div class="ingredient-tile"><strong>Чесночный порошок</strong><span>g · 9 RSD</span></div>
+              <div class="ingredient-tile"><strong>Кайенский перец</strong><span>g · 21 RSD</span></div>
+            </div>
+          </div>
+          <div class="group-panel">
+            <div class="group-head"><span>Соусы и маринады</span><span class="group-count">23 позиции</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-caption">
+      <h3>B. Группированный справочник</h3>
+      <p>Лучше для рецептов и визуального сканирования: ингредиенты сразу лежат в типах, карточки легче читать на мобильном, но плотность ниже.</p>
+    </div>
+  </div>
+
+  <div class="direction-card" data-choice="c-ops-stock" onclick="toggleSelect(this)">
+    <div class="mock-shell">
+      <div class="mock-page">
+        <div class="mock-title-row">
+          <div>
+            <p class="mock-title">Ингредиенты</p>
+            <p class="mock-subtitle">Остатки, цены и поставщики</p>
+          </div>
+          <button class="mock-primary">+ Поставка</button>
+        </div>
+        <div class="ops-grid">
+          <div class="ops-side">
+            <div class="metric"><span>Всего позиций</span><strong>128</strong></div>
+            <div class="metric"><span>Мало на складе</span><strong class="stock-low">9</strong></div>
+            <div class="metric"><span>Без цены</span><strong>14</strong></div>
+            <div class="metric"><span>Поставщиков</span><strong>6</strong></div>
+          </div>
+          <div>
+            <div class="mock-chip-row">
+              <span class="mock-chip active">Нужно внимание</span>
+              <span class="mock-chip">База</span>
+              <span class="mock-chip">Специи</span>
+            </div>
+            <table class="mock-table">
+              <thead>
+                <tr>
+                  <th>Ингредиент</th>
+                  <th>Остаток</th>
+                  <th>Цена</th>
+                  <th>Поставщик</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Говядина верхний круг</strong></td>
+                  <td class="stock-low">2.4 kg</td>
+                  <td>820 RSD</td>
+                  <td>Metro</td>
+                </tr>
+                <tr>
+                  <td><strong>Вустерширский соус</strong></td>
+                  <td>1.2 l</td>
+                  <td>7 RSD</td>
+                  <td>Local</td>
+                </tr>
+                <tr>
+                  <td><strong>Кайенский перец</strong></td>
+                  <td class="stock-low">80 g</td>
+                  <td>21 RSD</td>
+                  <td>Spicehub</td>
+                </tr>
+                <tr>
+                  <td><strong>Соевый соус</strong></td>
+                  <td>0.8 l</td>
+                  <td>Нет</td>
+                  <td>Metro</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-caption">
+      <h3>C. Операционная панель</h3>
+      <p>Если экран должен помогать закупкам: фокус на остатках, отсутствующих ценах и поставщиках. Самый полезный, но требует больше данных и API-поддержки.</p>
+    </div>
+  </div>
+</div>

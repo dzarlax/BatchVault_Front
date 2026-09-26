@@ -3,6 +3,7 @@ import { Modal, Form, Button, FormControl } from 'react-bootstrap';
 import { FaTimes } from 'react-icons/fa';
 import useTranslation from 'next-translate/useTranslation';
 import SelectDropdown from '../../SelectDropdown';
+import { useWorkspace } from '../../../utils/workspaceContext';
 
 interface OrderItem {
   product_id: number;
@@ -64,6 +65,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
   handleAddItem
 }) => {
   const { t } = useTranslation('common');
+  const { selectedCurrency } = useWorkspace();
 
   return (
     <Modal show={show} onHide={onClose} size="lg">
@@ -183,13 +185,13 @@ const OrderModal: React.FC<OrderModalProps> = ({
             <div className="summary-row">
               <span className="summary-label">{t('totalPrice')}:</span>
               <span className="summary-value fw-bold">
-                {items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)} {t('currency')}
+                {items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)} {selectedCurrency || ''}
               </span>
             </div>
             <div className="summary-row">
               <span className="summary-label text-secondary">{t('totalCost')}:</span>
               <span className="summary-value text-secondary">
-                {items.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0).toFixed(2)} {t('currency')}
+                {items.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0).toFixed(2)} {selectedCurrency || ''}
               </span>
             </div>
             <div className="summary-row">
@@ -198,7 +200,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 {(
                   items.reduce((sum, item) => sum + (item.price * item.quantity), 0) -
                   items.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0)
-                ).toFixed(2)} {t('currency')}
+                ).toFixed(2)} {selectedCurrency || ''}
               </span>
             </div>
           </div>

@@ -33,6 +33,8 @@ jobs:
           context: .
           push: true
           tags: |
+            ghcr.io/dzarlax/batchvault-front:latest
+            ghcr.io/dzarlax/batchvault-front:${{ github.sha }}
             ghcr.io/dzarlax/jerky-vault-frontend:latest
             ghcr.io/dzarlax/jerky-vault-frontend:${{ github.sha }}
           file: Dockerfile
@@ -41,4 +43,3 @@ jobs:
             MAPBOX_ACCESS_TOKEN=
           cache-from: type=gha
           cache-to: type=gha,mode=max
-

@@ -24,7 +24,7 @@ import { ClearFiltersButton, FilterBar } from '../components/filters/FilterBar';
 const Orders = () => {
   const { t } = useTranslation("common");
   const { auth } = useAuth();
-  const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
   const { success, error: showError } = useNotification();
   const router = useRouter();
 
@@ -301,7 +301,7 @@ const Orders = () => {
   const isLoading = !ordersData;
 
   const formatCurrency = (value: number) => {
-    return `${value.toFixed(2)} ${t('currency')}`;
+    return `${value.toFixed(2)} ${selectedCurrency || ''}`;
   };
 
   return (

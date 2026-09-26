@@ -91,6 +91,7 @@ export interface Workspace {
   slug: string;
   account_id?: number;
   role: string;
+  currency?: string;
 }
 
 export type UnitProfile = 'mass' | 'fine_mass' | 'volume' | 'count' | 'time';

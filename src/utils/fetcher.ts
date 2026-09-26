@@ -38,13 +38,34 @@ const shouldSendWorkspaceHeader = (endpoint: string) => {
   return endpoint !== '/api/workspaces' && !endpoint.startsWith('/api/auth/');
 };
 
+const getCurrentUserId = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const userId = user?.id || user?.userID || user?.userId;
+    if (userId) return String(userId);
+  } catch {
+    // Fall back to the token when persisted user data is unavailable.
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1] || ''));
+    const userId = payload.userID || payload.userId || payload.sub;
+    return userId ? String(userId) : null;
+  } catch {
+    return null;
+  }
+};
+
 const getValidatedWorkspaceId = (endpoint: string) => {
   if (typeof window === 'undefined' || !shouldSendWorkspaceHeader(endpoint)) {
     return null;
   }
 
   const validatedUserId = sessionStorage.getItem('workspace:validated-user-id');
-  if (!validatedUserId) return null;
+  if (!validatedUserId || validatedUserId !== getCurrentUserId()) return null;
 
   return localStorage.getItem(`workspace:selected:${validatedUserId}`);
 };
@@ -68,7 +89,7 @@ export default async function fetcher(endpoint, options: any = {}) {
     ...(workspaceId && { 'X-Workspace-ID': workspaceId }),
     ...callerHeaders,
   };
-  const { headers: _ignoredHeaders, ...requestOptions } = options;
+  const { headers: _ignoredHeaders, ignoreForbiddenAuthError = false, ...requestOptions } = options;
 
   try {
     const response = await fetch(url, {
@@ -78,7 +99,7 @@ export default async function fetcher(endpoint, options: any = {}) {
     });
 
     // Handle authentication errors
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401 || (response.status === 403 && !ignoreForbiddenAuthError)) {
       console.warn('Authentication failed, token may be expired or invalid');
       
       // Clear localStorage and call auth error handler if available
