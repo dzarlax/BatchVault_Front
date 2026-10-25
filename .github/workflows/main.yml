@@ -4,14 +4,47 @@ on:
   push:
     branches:
       - main
+      - security/2026-10-25-remediation
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Check image optimizer response limit
+        run: npm run test:security-image-optimizer
+
+      - name: Build application
+        run: npm run build:no-ssg
+
+  publish:
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -19,6 +52,19 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/dzarlax/batchvault-front
+            ghcr.io/dzarlax/jerky-vault-frontend
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=security-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/security/') }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -32,11 +78,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/dzarlax/batchvault-front:latest
-            ghcr.io/dzarlax/batchvault-front:${{ github.sha }}
-            ghcr.io/dzarlax/jerky-vault-frontend:latest
-            ghcr.io/dzarlax/jerky-vault-frontend:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
           file: Dockerfile
           build-args: |
             NEXT_PUBLIC_API_URL=http://localhost:8080
