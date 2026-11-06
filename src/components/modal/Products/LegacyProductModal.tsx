@@ -8,6 +8,7 @@ import SelectDropdown from "../../SelectDropdown";
 import { useWorkspace } from '../../../utils/workspaceContext';
 
 interface ProductModalProps {
+  message?: string;
   calculatedCost?: boolean;
   costingValid?: boolean;
   costingControls?: React.ReactNode;
@@ -35,6 +36,7 @@ interface ProductModalProps {
 }
 
 const ProductModal: React.FC<ProductModalProps> = ({
+  message,
   show,
   onClose,
   onSave,
@@ -141,6 +143,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
         </Modal.Title>
       </Modal.Header>
       <Modal.Body className="pt-0 px-3 px-md-4">
+        {message && <Alert variant="warning">{message}</Alert>}
         {errors.length > 0 && (
           <Alert variant="danger" className="mb-3">
             <FaInfoCircle className="me-2" />

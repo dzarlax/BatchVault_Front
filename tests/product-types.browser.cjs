@@ -256,3 +256,16 @@ test('conversion cannot reuse approval while the replacement preview is pending 
     await dialog.getByRole('button', { name: messages.save, exact: true }).click(); assert.equal(qa.writes.length, 0);
   } finally { release?.(); await qa.browser.close(); }
 });
+
+test('legacy product editor displays failed-save feedback without discarding the draft', { skip: !web }, async () => {
+  const qa = await setup({ capability: false, saveConflict: true });
+  try {
+    const dialog = await qa.open('Beef teriyaki');
+    await dialog.locator('#name').fill('Unsaved legacy name');
+    await dialog.getByRole('button', { name: messages.save, exact: true }).click();
+    await qa.expect(dialog.getByRole('alert')).toContainText(messages.productConfigurationConflict);
+    await qa.expect(dialog.locator('#name')).toHaveValue('Unsaved legacy name');
+    assert.equal(qa.writes.length, 1);
+    assert.equal('product_type' in qa.writes[0], false);
+  } finally { await qa.browser.close(); }
+});
