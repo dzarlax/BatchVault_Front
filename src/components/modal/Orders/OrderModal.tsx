@@ -23,7 +23,7 @@ interface Client {
 interface OrderModalProps {
   show: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: () => void | Promise<void>;
   clientOptions: { value: number, label: string }[];
   productOptions: { value: number, label: string }[];
   statusOptions: { value: string, label: string }[];
@@ -64,16 +64,57 @@ const OrderModal: React.FC<OrderModalProps> = ({
   handleAddItem
 }) => {
   const { t } = useTranslation('common');
-  const { selectedCurrency } = useWorkspace();
+  const { selectedCurrency, selectedWorkspaceId } = useWorkspace();
+  const [isBusy, setIsBusy] = React.useState(false);
+  const busy = React.useRef(false);
+  const operationVersion = React.useRef(0);
+  const previousWorkspace = React.useRef(selectedWorkspaceId);
+
+  const runOperation = async (operation: () => void | Promise<void>) => {
+    if (busy.current) return;
+    busy.current = true;
+    const version = ++operationVersion.current;
+    setIsBusy(true);
+    try { await operation(); }
+    finally {
+      if (operationVersion.current === version) {
+        busy.current = false;
+        setIsBusy(false);
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    if (!show) {
+      operationVersion.current++;
+      busy.current = false;
+      setIsBusy(false);
+    }
+  }, [show]);
+
+  React.useEffect(() => {
+    if (previousWorkspace.current !== selectedWorkspaceId) {
+      previousWorkspace.current = selectedWorkspaceId;
+      operationVersion.current++;
+      busy.current = false;
+      setIsBusy(false);
+      onClose();
+    }
+  }, [selectedWorkspaceId, onClose]);
+
+  React.useEffect(() => () => { operationVersion.current++; }, []);
+  const closeWhenIdle = () => { if (!busy.current) onClose(); };
 
   return (
-    <Modal show={show} onHide={onClose} size="lg">
-      <Modal.Header closeButton>
+    <Modal show={show} onHide={closeWhenIdle} backdrop={isBusy ? "static" : true} keyboard={!isBusy} size="lg">
+      <Modal.Header closeButton={!isBusy}>
         <Modal.Title>{t('orderDetails')}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form>
+          <fieldset disabled={isBusy} aria-busy={isBusy}>
           <SelectDropdown
+            isDisabled={isBusy}
             options={clientOptions}
             value={clientId ? clientOptions.find(option => option.value === clientId) : null}
             onChange={option => setClientId(option?.value || null)}
@@ -120,6 +161,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     <div className="form-row">
                       <Form.Group className="flex-1">
                         <SelectDropdown
+                          isDisabled={isBusy}
                           options={productOptions}
                           value={item.product_id > 0 ? (productOptions.find(option => option.value === item.product_id) ?? { value: item.product_id, label: `Unavailable product #${item.product_id}` }) : null}
                           onChange={option => handleProductChange(index, option?.value || 0)}
@@ -167,7 +209,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       </Form.Group>
                     </div>
                     <p className="small text-secondary mb-1">{item.id && !item.cost_source ? 'Saved order cost' : 'Current estimate for review'} · {item.cost_snapshot?.source || item.cost_source || 'manual'}</p>
-                    {!item.cost_snapshot && (item.cost_source === 'recipe' || item.cost_source === 'assortment') && <Button size="sm" variant="outline-secondary" onClick={() => void handleRefreshItemCost(index)}>Refresh estimated cost</Button>}
+                    {!item.cost_snapshot && (item.cost_source === 'recipe' || item.cost_source === 'assortment') && <Button size="sm" variant="outline-secondary" onClick={() => void runOperation(() => handleRefreshItemCost(index))}>Refresh estimated cost</Button>}
                   </div>
                 </div>
               ))}
@@ -179,6 +221,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
               )}
             </div>
           </div>
+          </fieldset>
         </Form>
       </Modal.Body>
       <Modal.Footer>
@@ -207,13 +250,13 @@ const OrderModal: React.FC<OrderModalProps> = ({
             </div>
           </div>
         )}
-        <Button variant="outline-secondary" className="me-2" onClick={onClose}>
+        <Button variant="outline-secondary" className="me-2" onClick={closeWhenIdle} disabled={isBusy}>
           {t('cancel')}
         </Button>
         <Button
           variant="primary"
-          onClick={onSave}
-          disabled={items.length === 0 || !clientId || items.some(item => !item.product_id || !Number.isFinite(item.cost_price) || item.cost_price < 0)}
+          onClick={() => void runOperation(onSave)}
+          disabled={isBusy || items.length === 0 || !clientId || items.some(item => !item.product_id || !Number.isFinite(item.cost_price) || item.cost_price < 0)}
         >
           {t('saveChanges')}
         </Button>

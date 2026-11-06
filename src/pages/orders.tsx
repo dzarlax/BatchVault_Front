@@ -112,6 +112,8 @@ const Orders = () => {
   };
 
   const handleSaveOrderChanges = async () => {
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -126,11 +128,17 @@ const Orders = () => {
           headers: {
             "Content-Type": "application/json",
             'Authorization': `Bearer ${token}`,
+            ...(workspace ? { 'X-Workspace-ID': workspace } : {}),
           },
           body: JSON.stringify(order),
         });
-        try { await fetcher(`/api/orders/${editingOrder.id}`); }
-        catch (readError) { handleCloseOrderModal(); showError('Order saved, but details could not be refreshed. Retry the read, not the save.'); mutateOrders(); return; }
+        if (activeCostWorkspace.current !== context) return;
+        try { await fetcher(`/api/orders/${editingOrder.id}`, { headers: workspace ? { 'X-Workspace-ID': workspace } : {} }); }
+        catch (readError) {
+          if (activeCostWorkspace.current !== context) return;
+          handleCloseOrderModal(); showError('Order saved, but details could not be refreshed. Retry the read, not the save.'); mutateOrders(); return;
+        }
+        if (activeCostWorkspace.current !== context) return;
         mutateOrders();
       } else {
         await fetcher("/api/orders", {
@@ -138,21 +146,27 @@ const Orders = () => {
           headers: {
             "Content-Type": "application/json",
             'Authorization': `Bearer ${token}`,
+            ...(workspace ? { 'X-Workspace-ID': workspace } : {}),
           },
           body: JSON.stringify(order),
         });
+        if (activeCostWorkspace.current !== context) return;
         mutateOrders();
       }
 
       handleCloseOrderModal();
       success(editingOrder ? t('orderUpdated') : t('orderCreated'));
     } catch (error) {
-      await invalidateCosting(selectedWorkspaceId);
+      if (activeCostWorkspace.current !== context) return;
+      await invalidateCosting(workspace);
+      if (activeCostWorkspace.current !== context) return;
       showError(error instanceof Error ? error.message : t('failedToSaveOrder'));
     }
   };
 
   const handleCreateOrder = async () => {
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -166,9 +180,11 @@ const Orders = () => {
         headers: {
           "Content-Type": "application/json",
           'Authorization': `Bearer ${token}`,
+            ...(workspace ? { 'X-Workspace-ID': workspace } : {}),
         },
         body: JSON.stringify(order),
       });
+      if (activeCostWorkspace.current !== context) return;
       setClientId(null);
       setComment("");
       setItems([]);
@@ -176,7 +192,9 @@ const Orders = () => {
       setShowCreateOrderModal(false);
       success(t('orderCreated'));
     } catch (error) {
-      await invalidateCosting(selectedWorkspaceId);
+      if (activeCostWorkspace.current !== context) return;
+      await invalidateCosting(workspace);
+      if (activeCostWorkspace.current !== context) return;
       showError(error instanceof Error ? error.message : t('failedToCreateOrder'));
     }
   };
@@ -212,20 +230,23 @@ const Orders = () => {
     }
   };
 
-  const activeCostWorkspace = React.useRef(selectedWorkspaceId);
-  activeCostWorkspace.current = selectedWorkspaceId;
+  const activeCostWorkspace = React.useRef({ workspace: selectedWorkspaceId });
+  if (activeCostWorkspace.current.workspace !== selectedWorkspaceId) {
+    activeCostWorkspace.current = { workspace: selectedWorkspaceId };
+  }
   const handleRefreshItemCost = async (index: number) => {
     const item = items[index];
     if (!item || item.cost_snapshot || !selectedWorkspaceId) return;
-    const workspace = selectedWorkspaceId;
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
     try {
       const patch = await refreshOrderItemEstimate(item, productId => fetcher(`/api/products/${productId}`, { headers: { 'X-Workspace-ID': workspace } }));
-      if (activeCostWorkspace.current !== workspace) return;
+      if (activeCostWorkspace.current !== context) return;
       setItems(current => current.map((row, i) =>
         i === index && row.id === item.id && row.product_id === item.product_id && !row.cost_snapshot ? { ...row, ...patch } : row
       ));
     } catch (error) {
-      if (activeCostWorkspace.current === workspace) showError(error instanceof Error ? error.message : 'Unable to refresh estimated cost');
+      if (activeCostWorkspace.current === context) showError(error instanceof Error ? error.message : 'Unable to refresh estimated cost');
     }
   };
 

@@ -56,9 +56,31 @@ for (const surface of ['/', '/orders']) {
       await expect(item.locator('input[type=number]').nth(2)).toHaveValue('320');
       await expect(item.locator('input[type=number]').nth(0)).toHaveValue('5');
       await expect(item.locator('input[type=number]').nth(1)).toHaveValue('600');
+      let releaseRead;
+      const readGate = new Promise(resolve => { releaseRead = resolve; });
+      let readStarted;
+      const started = new Promise(resolve => { readStarted = resolve; });
+      let writes = 0;
+      await context.route(`${api}/api/orders/${saved.id}`, async route => {
+        if (route.request().method() === 'GET') {
+          readStarted();
+          await readGate;
+        } else if (route.request().method() === 'PUT') writes++;
+        await route.continue();
+      });
       const put = page.waitForResponse(response => response.url() === `${api}/api/orders/${saved.id}` && response.request().method() === 'PUT');
-      await dialog.getByRole('button', { name: 'Save Changes', exact: true }).click();
+      const saveButton = dialog.getByRole('button', { name: 'Save Changes', exact: true });
+      await saveButton.click();
       assert.equal((await put).status(), 200);
+      await started;
+      try {
+        await expect(saveButton).toBeDisabled();
+        await expect(item.locator('input[type=number]').nth(0)).toBeDisabled();
+        await expect(dialog.getByRole('button', { name: '+ Add Product', exact: true })).toBeDisabled();
+        await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
+        await saveButton.evaluate(button => button.click());
+        assert.equal(writes, 1, 'A pending post-save read must never permit a second PUT');
+      } finally { releaseRead(); }
       await expect(dialog).not.toBeVisible();
       const result = await request('GET', `/orders/${saved.id}`);
       assert.equal(result.items.length, 2);

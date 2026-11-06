@@ -22,3 +22,5 @@ Fixture contract:
 On both `/` and `/orders`, the test adds a five-unit row, submits the stale quote and expects 409, explicitly refreshes the estimate, and saves. The new cost must become 320 while quantity stays 5 and selling price stays 600; the original saved row must retain cost 310 and its identity. Product runtime configuration is overridden only inside the browser context.
 
 With `COSTING_QA_CURRENCY=EUR`, the default synthetic workspace must use EUR and include recipe `QA flavour 1`. A third browser case verifies that its finished-content rate, the product cost, and the cost preview all display EUR. Numerical amounts are unchanged.
+
+Both order scenarios also hold the GET after a successful PUT. While that read is pending, Save, quantity changes, Add Product and Cancel must be disabled, and only one PUT may be sent. Releasing the GET then closes the saved editor without changing its draft fields.

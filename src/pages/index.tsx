@@ -329,6 +329,8 @@ const Dashboard = () => {
   };
 
   const handleSaveOrderChanges = async () => {
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -343,11 +345,17 @@ const Dashboard = () => {
           headers: {
             "Content-Type": "application/json",
             'Authorization': `Bearer ${token}`,
+            ...(workspace ? { 'X-Workspace-ID': workspace } : {}),
           },
           body: JSON.stringify(order),
         });
-        try { await fetcher(`/api/orders/${editingOrder.id}`); }
-        catch (readError) { handleCloseOrderModal(); showError('Order saved, but details could not be refreshed. Retry the read, not the save.'); mutateOrders(); return; }
+        if (activeCostWorkspace.current !== context) return;
+        try { await fetcher(`/api/orders/${editingOrder.id}`, { headers: workspace ? { 'X-Workspace-ID': workspace } : {} }); }
+        catch (readError) {
+          if (activeCostWorkspace.current !== context) return;
+          handleCloseOrderModal(); showError('Order saved, but details could not be refreshed. Retry the read, not the save.'); mutateOrders(); return;
+        }
+        if (activeCostWorkspace.current !== context) return;
         // Refresh orders data
         mutateOrders();
         mutateDashboardStats(); // Refresh dashboard stats (including recent_orders table)
@@ -355,7 +363,9 @@ const Dashboard = () => {
       }
       handleCloseOrderModal();
     } catch (error) {
-      await invalidateCosting(selectedWorkspaceId);
+      if (activeCostWorkspace.current !== context) return;
+      await invalidateCosting(workspace);
+      if (activeCostWorkspace.current !== context) return;
       showError(error instanceof Error ? error.message : t('failedToSaveOrder'));
     }
   };
@@ -378,20 +388,23 @@ const Dashboard = () => {
     }
   };
 
-  const activeCostWorkspace = React.useRef(selectedWorkspaceId);
-  activeCostWorkspace.current = selectedWorkspaceId;
+  const activeCostWorkspace = React.useRef({ workspace: selectedWorkspaceId });
+  if (activeCostWorkspace.current.workspace !== selectedWorkspaceId) {
+    activeCostWorkspace.current = { workspace: selectedWorkspaceId };
+  }
   const handleRefreshItemCost = async (index: number) => {
     const item = items[index];
     if (!item || item.cost_snapshot || !selectedWorkspaceId) return;
-    const workspace = selectedWorkspaceId;
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
     try {
       const patch = await refreshOrderItemEstimate(item, productId => fetcher(`/api/products/${productId}`, { headers: { 'X-Workspace-ID': workspace } }));
-      if (activeCostWorkspace.current !== workspace) return;
+      if (activeCostWorkspace.current !== context) return;
       setItems(current => current.map((row, i) =>
         i === index && row.id === item.id && row.product_id === item.product_id && !row.cost_snapshot ? { ...row, ...patch } : row
       ));
     } catch (error) {
-      if (activeCostWorkspace.current === workspace) showError(error instanceof Error ? error.message : 'Unable to refresh estimated cost');
+      if (activeCostWorkspace.current === context) showError(error instanceof Error ? error.message : 'Unable to refresh estimated cost');
     }
   };
 
