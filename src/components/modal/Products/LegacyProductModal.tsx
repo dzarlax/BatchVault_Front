@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { decimalInput } from '../../../utils/costing';
+import React, { useEffect, useRef, useState } from "react";
+import { focusFirstProductError } from '../../../utils/productEditorState';
+import type { ProductModalProps } from './ProductModal';
 import { Modal, Button, Form, Row, Col, Alert, InputGroup } from "react-bootstrap";
 import { FaTrash, FaSave, FaTimes, FaPlus, FaInfoCircle, FaTag, FaDollarSign, FaCog, FaUtensils, FaBoxOpen } from "react-icons/fa";
 import useTranslation from "next-translate/useTranslation";
@@ -7,36 +8,8 @@ import PackageModal from "./PackageModal";
 import SelectDropdown from "../../SelectDropdown";
 import { useWorkspace } from '../../../utils/workspaceContext';
 
-interface ProductModalProps {
-  message?: string;
-  calculatedCost?: boolean;
-  costingValid?: boolean;
-  costingControls?: React.ReactNode;
-  show: boolean;
-  onClose: () => void;
-  onSave: () => void;
-  onDelete: () => void;
-  product?: { id: number; name: string } | null;
-  name: string;
-  setName: (name: string) => void;
-  description: string;
-  setDescription: (description: string) => void;
-  price: string;
-  setPrice: (price: string) => void;
-  cost: string;
-  setCost: (cost: string) => void;
-  image: string;
-  setImage: (image: string) => void;
-  selectedRecipes: { value: number; label: string }[];
-  setSelectedRecipes: (recipes: { value: number; label: string }[]) => void;
-  recipeOptions: { value: number; label: string }[];
-  packageId: number | null;
-  setPackageId: (id: number | null) => void;
-  packageOptions: { value: number; label: string }[];
-}
-
 const ProductModal: React.FC<ProductModalProps> = ({
-  message,
+  message, busy = false, readOnly = false, savedRefreshRequired = false, onRefresh, onReload, validationErrors = {},
   show,
   onClose,
   onSave,
@@ -58,13 +31,17 @@ const ProductModal: React.FC<ProductModalProps> = ({
   packageId,
   setPackageId,
   packageOptions,
-  calculatedCost = false, costingValid = true, costingControls,
+  calculatedCost = false, costingControls,
 }) => {
   const { t } = useTranslation("common");
   const { selectedCurrency } = useWorkspace();
   const [showPackageModal, setShowPackageModal] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
-  useEffect(() => { if (!show) { setShowPackageModal(false); setErrors([]); } }, [show]);
+  const [attempted, setAttempted] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const titleId = React.useId();
+  const issue = (field: string) => attempted && validationErrors[field] ? t(validationErrors[field].key, validationErrors[field].values) : undefined;
+  const errors = attempted ? Object.values(validationErrors).map(error => t(error.key, error.values)) : [];
+  useEffect(() => { if (!show) { setShowPackageModal(false); setAttempted(false); } }, [show]);
 
   const handlePackageCreated = (newPackage: { id: number; name: string }) => {
     // Update the packageId with the newly created package
@@ -74,63 +51,27 @@ const ProductModal: React.FC<ProductModalProps> = ({
     // This will be handled by the parent component through SWR's mutate
   };
 
-  // Validation function
-  const validateForm = () => {
-    const validationErrors = [];
-
-    if (!name.trim()) validationErrors.push(t('productNameRequired'));
-    if (!description.trim()) validationErrors.push(t('productDescriptionRequired'));
-    if (!price || parseFloat(price) <= 0) validationErrors.push(t('validPriceRequired'));
-    if (!calculatedCost && decimalInput(cost) == null) validationErrors.push(t('costingNonNegativeManual'));
-    if (!costingValid) validationErrors.push(t('costingReviewWeights'));
-    if (!packageId) validationErrors.push(t('packageRequired'));
-
-
-    // Validate image URL if provided
-    if (image.trim()) {
-      try {
-        new URL(image);
-      } catch (_) {
-        validationErrors.push(t('invalidImageUrl'));
-      }
-    }
-
-    setErrors(validationErrors);
-    return validationErrors.length === 0;
-  };
-
   const handleSave = () => {
-    if (validateForm()) {
-      setErrors([]);
-      onSave();
-    }
+    if (busy || readOnly) return;
+    if (savedRefreshRequired) { onRefresh?.(); return; }
+    setAttempted(true);
+    if (Object.keys(validationErrors).length === 0) onSave(); else focusFirstProductError(bodyRef.current);
   };
-
-  const isFieldInvalid = (fieldName: string) => {
-    switch (fieldName) {
-      case 'name': return !name.trim();
-      case 'description': return !description.trim();
-      case 'price': return !price || parseFloat(price) <= 0;
-      case 'cost': return !calculatedCost && decimalInput(cost) == null;
-      case 'package': return !packageId;
-      case 'recipes': return false;
-      case 'image': return image.trim() && (() => { try { new URL(image); return false; } catch { return true; } })();
-      default: return false;
-    }
-  };
+  const isFieldInvalid = (field: string) => Boolean(issue(field === 'package' ? 'packageId' : field));
 
   return (
-    <Modal show={show} onHide={onClose} centered size="lg" className="product-modal">
-      <Modal.Header closeButton className="border-0 pb-0">
+    <Modal show={show} onHide={() => { if (!busy) onClose(); }} backdrop={busy ? 'static' : true} keyboard={!busy} centered size="lg" className="product-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton={!busy} closeLabel={t('close')} className="border-0 pb-0">
         <Modal.Title className="w-100">
           <div className="d-flex align-items-center justify-content-between">
-            <h4 className="mb-0 text-primary">
+            <h4 id={titleId} className="mb-0 text-primary">
               <FaTag className="me-2" />
               {product ? t("editProduct") : t("addProduct")}
             </h4>
             {product && (
               <Button
                 variant="outline-danger"
+                disabled={busy || readOnly || savedRefreshRequired}
                 onClick={onDelete}
                 className="btn-icon product-modal-delete-header d-none d-sm-inline-flex"
                 title={t("delete")}
@@ -142,21 +83,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
           </div>
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body className="pt-0 px-3 px-md-4">
-        {message && <Alert variant="warning">{message}</Alert>}
-        {errors.length > 0 && (
-          <Alert variant="danger" className="mb-3">
-            <FaInfoCircle className="me-2" />
-            <strong>{t('pleaseFixErrors')}:</strong>
-            <ul className="mb-0 mt-2">
-              {errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </Alert>
-        )}
-
-        <Form>
+      <Modal.Body ref={bodyRef} className="pt-0 px-3 px-md-4">
+        <Form onSubmit={event => { event.preventDefault(); handleSave(); }}>
+          <fieldset disabled={busy || readOnly || savedRefreshRequired} className="border-0 p-0 m-0">
           <div className="form-section mb-3 p-3 rounded">
             <h5 className="section-title text-primary mb-3">
               <FaInfoCircle className="me-2" />
@@ -166,7 +95,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
               <Col md={6}>
                 <Form.Group controlId="name" className="mb-3">
                   <Form.Label>
-                    {t("name")} <span className="text-danger">*</span>
+                    {t("productNameLabel")} <span className="text-danger">*</span>
                   </Form.Label>
                   <InputGroup>
                     <InputGroup.Text>
@@ -178,12 +107,12 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       onChange={(e) => setName(e.target.value)}
                       required
                       placeholder={t("enterName")}
-                      isInvalid={isFieldInvalid('name')}
+                      isInvalid={isFieldInvalid('name')} aria-invalid={isFieldInvalid('name')} aria-describedby={isFieldInvalid('name') ? 'name-error' : undefined}
                     />
                   </InputGroup>
                   {isFieldInvalid('name') && (
-                    <Form.Control.Feedback type="invalid">
-                      {t('productNameRequired')}
+                    <Form.Control.Feedback id="name-error" className="d-block" type="invalid">
+                      {issue('name')}
                     </Form.Control.Feedback>
                   )}
                 </Form.Group>
@@ -196,11 +125,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     value={image}
                     onChange={(e) => setImage(e.target.value)}
                     placeholder="https://example.com/image.jpg"
-                    isInvalid={isFieldInvalid('image')}
+                    isInvalid={isFieldInvalid('image')} aria-invalid={isFieldInvalid('image')} aria-describedby={isFieldInvalid('image') ? 'image-error' : undefined}
                   />
                   {isFieldInvalid('image') && (
-                    <Form.Control.Feedback type="invalid">
-                      {t('invalidImageUrl')}
+                    <Form.Control.Feedback id="image-error" className="d-block" type="invalid">
+                      {issue('image')}
                     </Form.Control.Feedback>
                   )}
                   <Form.Text className="text-muted">
@@ -220,11 +149,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 onChange={(e) => setDescription(e.target.value)}
                 required
                 placeholder={t("enterDescription")}
-                isInvalid={isFieldInvalid('description')}
+                isInvalid={isFieldInvalid('description')} aria-invalid={isFieldInvalid('description')} aria-describedby={isFieldInvalid('description') ? 'description-error' : undefined}
               />
               {isFieldInvalid('description') && (
-                <Form.Control.Feedback type="invalid">
-                  {t('productDescriptionRequired')}
+                <Form.Control.Feedback id="description-error" className="d-block" type="invalid">
+                  {issue('description')}
                 </Form.Control.Feedback>
               )}
             </Form.Group>
@@ -244,19 +173,19 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   <InputGroup>
                     <InputGroup.Text>{selectedCurrency || ''}</InputGroup.Text>
                     <Form.Control
-                      type="number"
+                      type="text" inputMode="decimal"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
                       required
                       min="0"
                       step="0.01"
                       placeholder="0.00"
-                      isInvalid={isFieldInvalid('price')}
+                      isInvalid={isFieldInvalid('price')} aria-invalid={isFieldInvalid('price')} aria-describedby={isFieldInvalid('price') ? 'price-error' : undefined}
                     />
                   </InputGroup>
                   {isFieldInvalid('price') && (
-                    <Form.Control.Feedback type="invalid">
-                      {t('validPriceRequired')}
+                    <Form.Control.Feedback id="price-error" className="d-block" type="invalid">
+                      {issue('price')}
                     </Form.Control.Feedback>
                   )}
                 </Form.Group>
@@ -269,19 +198,19 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   <InputGroup>
                     <InputGroup.Text>{selectedCurrency || ''}</InputGroup.Text>
                     <Form.Control
-                      type="number"
+                      type="text" inputMode="decimal"
                       value={cost}
                       onChange={(e) => setCost(e.target.value)}
                       required
                       min="0"
                       step="0.01"
                       placeholder="0.00"
-                      isInvalid={isFieldInvalid('cost')}
+                      isInvalid={isFieldInvalid('cost')} aria-invalid={isFieldInvalid('cost')} aria-describedby={isFieldInvalid('cost') ? 'cost-error' : undefined}
                     />
                   </InputGroup>
                   {isFieldInvalid('cost') && (
-                    <Form.Control.Feedback type="invalid">
-                      {t('validCostRequired')}
+                    <Form.Control.Feedback id="cost-error" className="d-block" type="invalid">
+                      {issue('cost')}
                     </Form.Control.Feedback>
                   )}
                 </Form.Group>
@@ -312,7 +241,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       <FaPlus />
                     </Button>
                   </div>
-                  <SelectDropdown
+                  <SelectDropdown isDisabled={busy || readOnly || savedRefreshRequired} inputId="packageId"
                     options={packageOptions}
                     value={packageOptions.find(
                       (option) => option.value === packageId
@@ -340,7 +269,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       </span>
                     )}
                   </div>
-                  <SelectDropdown
+                  <SelectDropdown isDisabled={busy || readOnly || savedRefreshRequired} inputId="recipeIds"
                     isMulti
                     options={recipeOptions}
                     value={selectedRecipes}
@@ -356,19 +285,26 @@ const ProductModal: React.FC<ProductModalProps> = ({
               </Col>
             </Row>
           </div>
-          {costingControls}
+          <div id="product-configuration" tabIndex={-1} aria-invalid={Boolean(issue('product-configuration'))} aria-describedby={issue('product-configuration') ? 'product-configuration-error' : undefined}>
+            {costingControls}
+            {issue('product-configuration') && <p id="product-configuration-error" className="text-danger">{issue('product-configuration')}</p>}
+          </div>
+          </fieldset>
         </Form>
       </Modal.Body>
       <Modal.Footer className="border-0 pt-3 px-3 px-md-4 product-modal-footer">
-        <Button variant="outline-secondary" onClick={onClose} className="w-100 mb-2 mb-sm-0 me-sm-2">
+        {errors.length > 0 && <div role="alert" className="product-editor-action-message text-danger w-100">{t('pleaseFixErrors')}: {errors[0]}</div>}
+        {message && <div className="product-editor-action-message w-100"><Alert variant="warning" className="mb-0">{message}{onReload && <Button variant="outline-secondary" size="sm" className="ms-2" disabled={busy} onClick={onReload}>{t('productReloadConfiguration')}</Button>}</Alert></div>}
+        <Button variant="outline-secondary" disabled={busy} onClick={onClose} className="w-100 mb-2 mb-sm-0 me-sm-2">
           <FaTimes className="me-2" /> {t("cancel")}
         </Button>
         <Button
           variant="primary"
+          disabled={busy || readOnly}
           onClick={handleSave}
           className="w-100"
         >
-          <FaSave className="me-2" /> {t("save")}
+          <FaSave className="me-2" /> {t(savedRefreshRequired ? 'productRetryRead' : 'save')}
         </Button>
         {product && (
           <div className="product-modal-danger-zone d-sm-none">
