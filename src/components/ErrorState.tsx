@@ -7,26 +7,28 @@ interface ErrorStateProps {
   message?: string;
   onRetry?: () => void;
   fullPage?: boolean;
+  compact?: boolean;
 }
 
-const ErrorState: React.FC<ErrorStateProps> = ({ 
-  message, 
-  onRetry, 
-  fullPage = false 
+const ErrorState: React.FC<ErrorStateProps> = ({
+  message,
+  onRetry,
+  fullPage = false,
+  compact = false,
 }) => {
   const { t } = useTranslation('common');
   const defaultMessage = t('unknownError');
 
   const content = (
-    <div className="error-state text-center py-5">
+    <div className={`error-state text-center ${compact ? 'error-state-compact' : 'py-5'}`} role="alert">
       <div className="error-icon mb-3">
-        <FaExclamationTriangle size={48} className="text-danger" />
+        <FaExclamationTriangle size={compact ? 20 : 48} className="text-danger" aria-hidden="true" />
       </div>
-      <h4 className="error-title mb-3">{t('errorOccurred')}</h4>
-      <p className="error-message text-muted mb-4">{message || defaultMessage}</p>
+      <h4 className={`error-title ${compact ? 'mb-1' : 'mb-3'}`}>{t('errorOccurred')}</h4>
+      <p className={`error-message text-muted ${compact ? 'mb-2' : 'mb-4'}`}>{message || defaultMessage}</p>
       {onRetry && (
         <Button variant="outline-primary" onClick={onRetry}>
-          <FaSync className="me-2" /> {t('tryAgain')}
+          <FaSync className="me-2" aria-hidden="true" /> {t('tryAgain')}
         </Button>
       )}
     </div>
@@ -35,7 +37,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
   if (fullPage) {
     return (
       <Container fluid className="vh-100 d-flex align-items-center justify-content-center">
-        <div className="error-container p-4 rounded shadow-sm bg-white" style={{ maxWidth: '500px' }}>
+        <div className="error-container p-4 rounded shadow-sm" style={{ maxWidth: '500px' }}>
           {content}
         </div>
       </Container>

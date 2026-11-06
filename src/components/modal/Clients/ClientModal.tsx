@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useId } from 'react';
 import { Modal, Button, Form, Row, Col, InputGroup, Alert } from 'react-bootstrap';
 import { FaTrash, FaUser, FaPhone, FaTelegram, FaInstagram, FaMapMarkerAlt, FaTag } from 'react-icons/fa';
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
@@ -27,6 +27,7 @@ const ClientModal = ({
   mapboxToken,
   t,
 }) => {
+  const titleId = `client-modal-title-${useId()}`;
   const geocoderContainerRef = useRef(null);
   const geocoderRef = useRef(null);
   
@@ -125,7 +126,7 @@ const ClientModal = ({
       setErrors({});
       setTouched({});
       
-      if (geocoderContainerRef.current) {
+      if (mapboxToken && geocoderContainerRef.current) {
         if (geocoderRef.current) {
           geocoderRef.current.clear();
         }
@@ -150,8 +151,8 @@ const ClientModal = ({
   }, [show, mapboxToken, t]);
 
   return (
-    <Modal show={show} onHide={onHide} size="lg" className="client-modal">
-      <Modal.Header closeButton>
+    <Modal show={show} onHide={onHide} size="lg" className="client-modal ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
         {client && (
           <Button 
             variant="outline-danger" 
@@ -163,7 +164,7 @@ const ClientModal = ({
             <FaTrash />
           </Button>
         )}
-        <Modal.Title className="d-flex align-items-center">
+        <Modal.Title id={titleId} className="d-flex align-items-center">
           <FaUser className="me-2" />
           {client ? t('editClient') : t('addClient')}
         </Modal.Title>
@@ -334,15 +335,21 @@ const ClientModal = ({
               <FaMapMarkerAlt className="me-2" />
               {t('addressInformation')}
             </h6>
-            <Form.Group className="mb-3">
+            <Form.Group className="mb-3" controlId={`${titleId}-address`}>
               <Form.Label className="d-flex align-items-center">
                 {t('address')}
               </Form.Label>
               <div className="position-relative">
-                <div 
+                {!mapboxToken && <Form.Control
+                  type="text"
+                  value={address}
+                  onChange={(event) => handleFieldChange('address', event.target.value, setAddress)}
+                  autoComplete="street-address"
+                />}
+                {mapboxToken && <div
                   ref={geocoderContainerRef} 
                   className={`geocoder-container ${touched.address && errors.address ? 'is-invalid' : ''}`}
-                ></div>
+                />}
                 {touched.address && errors.address && (
                   <div className="invalid-feedback d-block">
                     {errors.address}

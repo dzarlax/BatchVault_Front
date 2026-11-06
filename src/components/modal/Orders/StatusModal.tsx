@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Modal, Form, Button } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 import SelectDropdown from '../../../components/SelectDropdown';
@@ -26,11 +26,12 @@ const StatusModal: React.FC<StatusModalProps> = ({
   setStatus
 }) => {
   const { t } = useTranslation('common');
+  const titleId = `order-status-modal-title-${useId()}`;
 
   return (
-    <Modal show={show} onHide={onClose}>
-      <Modal.Header closeButton>
-        <Modal.Title>{t('changeStatus')}</Modal.Title>
+    <Modal show={show} onHide={onClose} className="ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
+        <Modal.Title id={titleId}>{t('changeStatus')}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form>

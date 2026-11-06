@@ -8,6 +8,7 @@ import { Table, Button } from "react-bootstrap";
 import { SingleValue } from 'react-select';
 import TableSkeleton from '../components/skeletons/TableSkeleton';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { StatusBadge } from '../components/StatusBadge';
 import SelectDropdown from '../components/SelectDropdown';
 import OrderModal from "../components/modal/Orders/OrderModal";
@@ -30,22 +31,22 @@ const Orders = () => {
   const { success, error: showError } = useNotification();
   const router = useRouter();
 
-  const { data: ordersData, mutate: mutateOrders } = useSWR<Order[]>(
+  const { data: ordersData, mutate: mutateOrders, error: ordersError } = useSWR<Order[]>(
     workspaceKey("/api/orders", selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
-  const { data: clientsData = [], mutate: mutateClients } = useSWR<Client[]>(
+  const { data: clientsData, mutate: mutateClients, error: clientsError } = useSWR<Client[]>(
     workspaceKey("/api/clients", selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
-  const { data: productsData = [], mutate: mutateProducts } = useSWR<Product[]>(
+  const { data: productsData, mutate: mutateProducts, error: productsError } = useSWR<Product[]>(
     workspaceKey("/api/products", selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
 
   const orders = ordersData ?? [];
-  const clients = clientsData;
-  const products = productsData;
+  const clients = clientsData ?? [];
+  const products = productsData ?? [];
 
   const [clientId, setClientId] = useState<number | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -351,7 +352,15 @@ const Orders = () => {
   };
 
   const hasActiveFilters = selectedStatus || selectedClientFilter;
-  const isLoading = !ordersData;
+  const isLoading = !ordersData && !ordersError;
+  const referencesUnavailable = !clientsData || !productsData || Boolean(clientsError || productsError);
+  const hasReadError = ordersError || clientsError || productsError;
+  const totalsForOrder = (order: Order) => {
+    const revenue = order.items?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
+    const cost = order.items?.reduce((sum, item) => sum + item.cost_price * item.quantity, 0) || 0;
+    const profit = order.items?.reduce((sum, item) => sum + (item.price - item.cost_price) * item.quantity, 0) || 0;
+    return { revenue, cost, profit };
+  };
 
   const formatCurrency = (value: number) => {
     return `${value.toFixed(2)} ${selectedCurrency || ''}`;
@@ -377,6 +386,7 @@ const Orders = () => {
         </div>
         <Button
           className="btn btn-primary"
+          disabled={referencesUnavailable}
           onClick={() => {
             setClientId(null);
             setStatus("new");
@@ -391,7 +401,7 @@ const Orders = () => {
       </div>
 
       {/* Filter Section */}
-      <FilterBar>
+      <FilterBar mobileCollapsible activeCount={[selectedStatus, selectedClientFilter].filter(Boolean).length} summary={[selectedStatus?.label, selectedClientFilter?.label].filter(Boolean).join(' · ')} onClear={clearFilters}>
         <div className="filter-group">
           <SelectDropdown
             options={statusOptions}
@@ -405,6 +415,7 @@ const Orders = () => {
         <div className="filter-group">
           <SelectDropdown
             options={clientOptions}
+            isDisabled={!clientsData || Boolean(clientsError)}
             value={selectedClientFilter}
             onChange={setSelectedClientFilter}
             placeholder={t('allClients')}
@@ -419,15 +430,17 @@ const Orders = () => {
         />
       </FilterBar>
 
+      {hasReadError && <ErrorState message={t(referencesUnavailable && !ordersError ? 'uiOrderReferencesUnavailable' : 'failedToLoadOrders')} compact={Boolean(ordersData)} onRetry={() => { void Promise.allSettled([mutateOrders(), mutateClients(), mutateProducts()]); }} />}
+
       {/* Orders Table */}
-      {isLoading ? (
+      {!ordersData && ordersError ? null : isLoading ? (
         <TableSkeleton rows={10} columns={10} />
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <EmptyState
           type="orders"
-          message={t('noOrders')}
-          actionLabel={t('createOrder')}
-          onAction={() => {
+          message={t(hasActiveFilters ? 'noOrdersFound' : 'noOrders')}
+          actionLabel={hasActiveFilters ? t('clear') : !referencesUnavailable ? t('createOrder') : undefined}
+          onAction={hasActiveFilters ? clearFilters : () => {
             setClientId(null);
             setStatus("new");
             setComment("");
@@ -436,7 +449,8 @@ const Orders = () => {
           }}
         />
       ) : (
-        <div className="table-responsive orders-table-wrap">
+        <>
+        <div className="table-responsive orders-table-wrap orders-desktop-table">
           <Table className="table orders-table">
             <thead>
               <tr>
@@ -497,15 +511,15 @@ const Orders = () => {
                   </td>
                   <td>
                     <span className="fw-semibold">
-                      {formatCurrency(order.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0)}
+                      {formatCurrency(totalsForOrder(order).revenue)}
                     </span>
                   </td>
                   <td className="text-secondary">
-                    {formatCurrency(order.items?.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0) || 0)}
+                    {formatCurrency(totalsForOrder(order).cost)}
                   </td>
-                  <td className={(order.items?.reduce((sum, item) => sum + ((item.price - item.cost_price) * item.quantity), 0) || 0) >= 0 ? 'text-success' : 'text-error'}>
+                  <td className={(totalsForOrder(order).profit) >= 0 ? 'text-success' : 'text-error'}>
                     <span className="fw-semibold">
-                      {formatCurrency(order.items?.reduce((sum, item) => sum + ((item.price - item.cost_price) * item.quantity), 0) || 0)}
+                      {formatCurrency(totalsForOrder(order).profit)}
                     </span>
                   </td>
                   <td>
@@ -513,21 +527,21 @@ const Orders = () => {
                       <button
                         onClick={() => handleChangeStatus(order.id)}
                         className="btn btn-ghost btn-sm"
-                        title={t("changeStatus")}
+                        title={t("changeStatus")} aria-label={`${t("changeStatus")} #${order.id}`}
                       >
                         <FaSync size={14} />
                       </button>
                       <button
                         onClick={() => handleEditOrder(order)}
                         className="btn btn-ghost btn-sm"
-                        title={t("edit")}
+                        title={t("edit")} aria-label={`${t("edit")} #${order.id}`} disabled={referencesUnavailable}
                       >
                         <FaPencilAlt size={14} />
                       </button>
                       <button
                         onClick={() => handleDeleteOrder(order.id)}
                         className="btn btn-ghost btn-sm text-error"
-                        title={t("delete")}
+                        title={t("delete")} aria-label={`${t("delete")} #${order.id}`}
                       >
                         <FaTrash size={14} />
                       </button>
@@ -538,6 +552,32 @@ const Orders = () => {
             </tbody>
           </Table>
         </div>
+        <div className="orders-mobile-list">
+          {filteredOrders.map(order => {
+            const client = clients.find(client => client.id === order.client_id) || order.client;
+            const totals = totalsForOrder(order);
+            return <article key={order.id} className="order-mobile-card" aria-label={`${t('orderDetails')} #${order.id}`}>
+              <div className="order-mobile-card-header">
+                <span className="text-secondary">#{order.id}</span>
+                <StatusBadge status={t(order.status)} variant={order.status === 'new' ? 'brand' : order.status === 'in_progress' ? 'warning' : order.status === 'canceled' ? 'error' : order.status === 'ready' ? 'info' : 'success'} />
+              </div>
+              <h2 className="h5"><button type="button" className="btn-link" disabled={!client} onClick={() => client && handleClientClick(client)}>{client ? `${client.name} ${client.surname || ''}`.trim() : t('unknownClient')}</button></h2>
+              <div className="order-mobile-card-meta"><time dateTime={order.created_at}>{new Date(order.created_at).toLocaleDateString(router.locale)}</time></div>
+              <div className="order-mobile-card-total"><span>{t('total')}</span><strong>{formatCurrency(totals.revenue)}</strong></div>
+              <details className="order-mobile-card-details"><summary>{t('orderDetails')}</summary>
+                <ul>{order.items?.map((item, index) => <li key={item.id || index}>{products.find(product => product.id === item.product_id)?.name || t('unknownProduct')} × {item.quantity}</li>)}</ul>
+                <dl><dt>{t('cost')}</dt><dd>{formatCurrency(totals.cost)}</dd><dt>{t('profit')}</dt><dd>{formatCurrency(totals.profit)}</dd></dl>
+                {order.comment && <p>{order.comment}</p>}
+              </details>
+              <div className="order-mobile-card-actions">
+                <Button variant="primary" disabled={referencesUnavailable} onClick={() => handleEditOrder(order)} aria-label={`${t('edit')} #${order.id}`}><FaPencilAlt aria-hidden="true" /> {t('edit')}</Button>
+                <Button variant="outline-secondary" onClick={() => handleChangeStatus(order.id)} aria-label={`${t('changeStatus')} #${order.id}`}><FaSync aria-hidden="true" /> {t('changeStatus')}</Button>
+                <Button variant="outline-danger" onClick={() => handleDeleteOrder(order.id)} aria-label={`${t('delete')} #${order.id}`}><FaTrash aria-hidden="true" /> {t('delete')}</Button>
+              </div>
+            </article>;
+          })}
+        </div>
+        </>
       )}
 
       {/* Modals */}

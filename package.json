@@ -12,9 +12,9 @@
     "start:next": "next start",
     "lint": "next lint",
     "depcheck": "node --loader ts-node/esm ./node_modules/.bin/depcheck",
-    "test:costing": "node --test tests/order-cost-refresh.test.cjs tests/product-types.test.cjs tests/product-editor-state.test.cjs",
+    "test:costing": "node --test tests/order-cost-refresh.test.cjs tests/product-types.test.cjs tests/product-editor-state.test.cjs tests/editor-draft-state.test.cjs",
     "test:costing:browser": "node tests/run-costing-browser.cjs",
-    "test:ui": "node --test tests/ui-review.browser.cjs"
+    "test:ui": "node --test tests/ui-review.browser.cjs tests/orders-recipes-ui.browser.cjs"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-geocoder": "^5.0.3",

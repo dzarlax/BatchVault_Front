@@ -121,7 +121,8 @@ test('recipe rates, product totals, and previews use the workspace currency', {
     await expect(page.locator('.recipe-detail-panel-desktop').getByText(`Finished content: 3000.00 ${currency} / kg`, { exact: true })).toBeVisible();
     await page.goto(`${web}/products`, { waitUntil: 'networkidle' });
     const card = page.locator('.product-card').filter({ hasText: 'QA Ordinary 100 g' });
-    await expect(card.locator('.product-metric-value.cost')).toHaveText(`320.00 ${currency}`);
+    await card.locator('.product-card-details > summary').click();
+    await expect(card.locator('.product-card-financial-detail')).toContainText(`320.00 ${currency}`);
     await card.getByRole('button', { name: 'Edit QA Ordinary 100 g' }).click();
     const panel = page.getByRole('region', { name: 'Cost calculation' });
     await expect(panel).toContainText(currency);

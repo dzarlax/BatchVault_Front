@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Modal, Form, Button, ListGroup } from 'react-bootstrap';
 import { FaCalculator } from 'react-icons/fa';
 import { Recipe, RecipeIngredient } from '../../types/api';
@@ -11,6 +11,7 @@ interface RecipeCalculatorProps {
 }
 
 const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recipe, t }) => {
+  const titleId = `recipe-calculator-modal-title-${useId()}`;
   const [baseIngredient, setBaseIngredient] = useState<{
     id: number;
     quantity: string;
@@ -62,9 +63,9 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
   if (!recipe) return null;
 
   return (
-    <Modal show={show} onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>
+    <Modal show={show} onHide={onHide} centered className="ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
+        <Modal.Title id={titleId}>
           <FaCalculator className="me-2" />
           {t('recipeCalculator')} - {recipe.name}
         </Modal.Title>
@@ -72,7 +73,7 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
       <Modal.Body>
         {baseIngredient && (
           <Form>
-            <Form.Group className="mb-3">
+            <Form.Group className="mb-3" controlId={`${titleId}-base-weight`}>
               <Form.Label>
                 {t('baseIngredient')}: <strong>{baseIngredient.ingredient?.name || t('unknownIngredient')}</strong>
               </Form.Label>

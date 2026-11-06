@@ -4,6 +4,7 @@ import { Button, Table } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 import fetcher from '../utils/fetcher';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import IngredientTypeBadge from '../components/IngredientTypeBadge';
 import { useRouter } from 'next/router';
 import { useAuth, withAuth } from '../utils/authContext';
@@ -20,7 +21,7 @@ type PriceStateFilter = 'all' | 'missing' | 'priced';
 const Ingredients: React.FC = () => {
   const { auth } = useAuth();
   const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
-  const { data: workspaceIngredients, mutate } = useSWR<WorkspaceIngredient[]>(
+  const { data: workspaceIngredients, mutate, error: ingredientsError } = useSWR<WorkspaceIngredient[]>(
     workspaceKey('/api/workspace-ingredients', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
@@ -110,11 +111,11 @@ const Ingredients: React.FC = () => {
     );
   };
 
-  const isLoading = !isWorkspaceReady || !workspaceIngredients;
+  const isLoading = !isWorkspaceReady || (!workspaceIngredients && !ingredientsError);
 
   const filteredIngredients = useMemo(() => {
     return workspaceIngredients?.filter((workspaceIngredient) => {
-      const nameMatch = workspaceIngredient.ingredient.name.toLowerCase().includes(filter.toLowerCase());
+      const nameMatch = workspaceIngredient.ingredient.name.toLowerCase().includes(filter.trim().toLowerCase());
       const typeMatch = filterType === 'all' || workspaceIngredient.ingredient.type === filterType;
       const priceStateMatch =
         filterPriceState === 'all' ||
@@ -125,7 +126,7 @@ const Ingredients: React.FC = () => {
     }) || [];
   }, [filter, filterPriceState, filterType, workspaceIngredients]);
 
-  const hasActiveFilters = !!filter || filterType !== 'all' || filterPriceState !== 'all';
+  const hasActiveFilters = !!filter.trim() || filterType !== 'all' || filterPriceState !== 'all';
 
   return (
     <div className="page-container ingredients-page">
@@ -155,7 +156,7 @@ const Ingredients: React.FC = () => {
       </div>
 
       {/* Filter Section */}
-      <FilterBar className="ingredients-filter-bar">
+      <FilterBar className="ingredients-filter-bar" mobileCollapsible activeCount={[filter.trim(), filterType !== 'all', filterPriceState !== 'all'].filter(Boolean).length} summary={[filter.trim(), filterType !== 'all' ? t(filterType) : '', filterPriceState !== 'all' ? t(filterPriceState === 'missing' ? 'missingPrice' : 'hasPrice') : ''].filter(Boolean).join(' · ')} onClear={clearFilters}>
         <SearchFilter
           label={t('search')}
           value={filter}
@@ -185,8 +186,10 @@ const Ingredients: React.FC = () => {
         />
       </FilterBar>
 
+      {ingredientsError && <ErrorState message={t('ingredientsError')} compact={Boolean(workspaceIngredients)} onRetry={() => { void mutate(); }} />}
+
       {/* Ingredients List */}
-      {isLoading ? (
+      {!workspaceIngredients && ingredientsError ? null : isLoading ? (
         <div className="text-center py-5">
           <p className="text-secondary">{t('loading')}</p>
         </div>
@@ -194,8 +197,8 @@ const Ingredients: React.FC = () => {
         <EmptyState
           type="ingredients"
           message={hasActiveFilters ? t('noIngredientsFound') : t('noIngredients')}
-          actionLabel={t('addIngredient')}
-          onAction={() => setShowAddModal(true)}
+          actionLabel={t(hasActiveFilters ? 'clear' : 'addIngredient')}
+          onAction={hasActiveFilters ? clearFilters : () => setShowAddModal(true)}
         />
       ) : (
         <div className="table-responsive ingredients-table-wrap">

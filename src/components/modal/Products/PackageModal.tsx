@@ -1,4 +1,5 @@
 import useTranslation from 'next-translate/useTranslation';
+import { useId } from 'react';
 import SelectDropdown from '../../SelectDropdown';
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
@@ -13,6 +14,7 @@ import { decimalInput, invalidateCosting } from '../../../utils/costing';
 interface PackageModalProps { show: boolean; onClose: () => void; onPackageCreated: (pkg: ProductPackage) => void; }
 export default function PackageModal({ show, onClose, onPackageCreated }: PackageModalProps) {
   const { t } = useTranslation('common');
+  const titleId = `package-modal-title-${useId()}`;
   const { auth } = useAuth();
   const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
   const { data: packages = [] } = useSWR<ProductPackage[]>(workspaceKey('/api/packages', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady), workspaceFetcher);
@@ -48,7 +50,7 @@ export default function PackageModal({ show, onClose, onPackageCreated }: Packag
     finally { setSaving(false); }
   };
   const formatOptions = [{ value: 0, label: t('costingCreateFormat') }, ...packages.map(pkg => ({ value: pkg.id, label: `${pkg.name} · ${pkg.net_weight_g != null ? t('costingGramsValue', { weight: pkg.net_weight_g }) : t('costingWeightUnknown')}` }))];
-  return <Modal show={show} onHide={onClose} centered size="lg"><Modal.Header closeButton><Modal.Title>{t('costingPackagingFormats')}</Modal.Title></Modal.Header><Modal.Body>
+  return <Modal show={show} onHide={onClose} centered size="lg" className="ui-workflow-modal" aria-labelledby={titleId}><Modal.Header closeButton closeLabel={t('close')}><Modal.Title id={titleId}>{t('costingPackagingFormats')}</Modal.Title></Modal.Header><Modal.Body>
     {error && <Alert variant="danger">{error}</Alert>}
     <Form.Group className="mb-3"><SelectDropdown inputId="packagingFormatToEdit" aria-label={t('costingFormatToEdit')} label={t('costingFormatToEdit')}
       options={formatOptions} value={formatOptions.find(option => option.value === editingId)} onChange={option => choose(option?.value ?? 0)} isSearchable

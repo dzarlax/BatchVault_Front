@@ -1,5 +1,5 @@
 import { decimalInput } from '../../../utils/costing';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Modal, Form, Button, Row, Col, Alert, InputGroup } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 import { FaPlus, FaDollarSign, FaWeight, FaRulerCombined, FaTag } from 'react-icons/fa';
@@ -41,6 +41,7 @@ const AddPriceModal: React.FC<AddPriceModalProps> = ({
   workspaceIngredients = []
 }) => {
   const { t } = useTranslation('common');
+  const titleId = `price-modal-title-${useId()}`;
   const { selectedCurrency } = useWorkspace();
   const [ingredientId, setIngredientId] = useState('');
   const [price, setPrice] = useState('');
@@ -153,9 +154,9 @@ const AddPriceModal: React.FC<AddPriceModalProps> = ({
   const unitOptions = toUnitOptions(units, t);
 
   return (
-    <Modal show={show} onHide={onClose} size="lg" className="add-price-modal">
-      <Modal.Header closeButton>
-        <Modal.Title>
+    <Modal show={show} onHide={onClose} size="lg" className="add-price-modal ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
+        <Modal.Title id={titleId}>
           <FaPlus className="me-2 text-primary" />
           {t('addPrice')}
         </Modal.Title>
