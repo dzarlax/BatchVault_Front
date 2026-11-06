@@ -1,0 +1,32 @@
+# Costing regression checks
+
+Run the unit tests with `npm run test:costing`. They use Node's test runner and the project's TypeScript compiler, with no browser dependency.
+
+The optional browser tests use a real isolated local API and a local web server. Run `npm run test:costing:browser` with:
+
+- `COSTING_QA_WEB_URL`: localhost web origin, without a trailing slash.
+- `COSTING_QA_API_URL`: localhost API origin, without `/api` or a trailing slash.
+- `PLAYWRIGHT_MODULE`: path to an installed Playwright package containing its `test` entry point, unless `playwright/test` is available normally.
+- `COSTING_QA_CHROME`: optional browser executable path.
+- `COSTING_QA_CURRENCY`: optional expected workspace currency, such as `EUR`, enabling the currency-display scenario.
+
+Both URLs are required to enable the tests; otherwise they skip. Public hostnames are rejected. The API must use a disposable synthetic database with notifications unconfigured. The tests update these fixture records and create orders; do not point them at personal or production data.
+
+Fixture contract:
+
+- Account `costing-qa`, password `local-costing-qa`, with its default personal workspace.
+- Product `QA Ordinary 100 g`: recipe costing, 100 g package, ingredient batch cost 900 and finished recipe yield 300 g.
+- Client with name `Synthetic`, surname `Costing QA`.
+- Ingredient prices remain fixed during these scenarios. The test resets package cost to 10 and selling price to 600 before each case, then changes them to 20 and 650 while the order form is open.
+
+On both `/` and `/orders`, the test adds a five-unit row, submits the stale quote and expects 409, explicitly refreshes the estimate, and saves. The new cost must become 320 while quantity stays 5 and selling price stays 600; the original saved row must retain cost 310 and its identity. Product runtime configuration is overridden only inside the browser context.
+
+With `COSTING_QA_CURRENCY=EUR`, the default synthetic workspace must use EUR and include recipe `QA flavour 1`. A third browser case verifies that its finished-content rate, the product cost, and the cost preview all display EUR. Numerical amounts are unchanged.
+
+Both order scenarios also hold the GET after a successful PUT. While that read is pending, Save, quantity changes, Add Product and Cancel must be disabled, and only one PUT may be sent. Releasing the GET then closes the saved editor without changing its draft fields.
+
+The browser runner executes the editor and order suites in separate API request windows (61 seconds apart). This preserves the backend's global per-IP limit, which runs before JWT authentication. Do not remove application rate limiting for these checks.
+
+The editor suite covers nested packaging cost changes and initial net weight assignment without changing the selected package ID, plus Russian desktop and Serbian mobile costing controls, shared dropdown interactions, translated issue/validation messages and recipe yield labels. `COSTING_QA_SCREENSHOTS` optionally selects an output directory for synthetic-data screenshots.
+
+For independently owned fixture records, set `COSTING_QA_EDITOR_USER_PREFIX` and seed four accounts ending in `cost`, `weight`, `ru`, and `rs`. Each needs the same synthetic product/recipe/package fixture contract and password as above. Without the prefix, the editor cases use `costing-qa` and restore the original product package after each packaging scenario. Fixture credentials are for disposable localhost data only.

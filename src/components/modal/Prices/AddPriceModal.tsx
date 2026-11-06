@@ -1,3 +1,4 @@
+import { decimalInput } from '../../../utils/costing';
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Button, Row, Col, Alert, InputGroup } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
@@ -83,7 +84,7 @@ const AddPriceModal: React.FC<AddPriceModalProps> = ({
     const validationErrors = [];
     
     if (!ingredientId) validationErrors.push(t('ingredientRequired'));
-    if (!isPositiveDecimalInput(price)) validationErrors.push(t('validPriceRequired'));
+    if (decimalInput(price) == null) validationErrors.push(t('costingNonNegativePrice'));
     if (!isPositiveDecimalInput(quantity)) validationErrors.push(t('validQuantityRequired'));
     if (!unit) validationErrors.push(t('unitRequired'));
     

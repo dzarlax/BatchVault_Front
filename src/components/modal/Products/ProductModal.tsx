@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { decimalInput } from '../../../utils/costing';
 import { Modal, Button, Form, Row, Col, Alert, InputGroup } from "react-bootstrap";
 import { FaTrash, FaSave, FaTimes, FaPlus, FaInfoCircle, FaTag, FaDollarSign, FaCog, FaUtensils, FaBoxOpen } from "react-icons/fa";
 import useTranslation from "next-translate/useTranslation";
@@ -7,6 +8,9 @@ import SelectDropdown from "../../SelectDropdown";
 import { useWorkspace } from '../../../utils/workspaceContext';
 
 interface ProductModalProps {
+  calculatedCost?: boolean;
+  costingValid?: boolean;
+  costingControls?: React.ReactNode;
   show: boolean;
   onClose: () => void;
   onSave: () => void;
@@ -52,11 +56,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
   packageId,
   setPackageId,
   packageOptions,
+  calculatedCost = false, costingValid = true, costingControls,
 }) => {
   const { t } = useTranslation("common");
   const { selectedCurrency } = useWorkspace();
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  useEffect(() => { if (!show) { setShowPackageModal(false); setErrors([]); } }, [show]);
   
   const handlePackageCreated = (newPackage: { id: number; name: string }) => {
     // Update the packageId with the newly created package
@@ -73,9 +79,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
     if (!name.trim()) validationErrors.push(t('productNameRequired'));
     if (!description.trim()) validationErrors.push(t('productDescriptionRequired'));
     if (!price || parseFloat(price) <= 0) validationErrors.push(t('validPriceRequired'));
-    if (!cost || parseFloat(cost) <= 0) validationErrors.push(t('validCostRequired'));
+    if (!calculatedCost && decimalInput(cost) == null) validationErrors.push(t('costingNonNegativeManual'));
+    if (!costingValid) validationErrors.push(t('costingReviewWeights'));
     if (!packageId) validationErrors.push(t('packageRequired'));
-    if (selectedRecipes.length === 0) validationErrors.push(t('atLeastOneRecipeRequired'));
+
     
     // Validate image URL if provided
     if (image.trim()) {
@@ -102,9 +109,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
       case 'name': return !name.trim();
       case 'description': return !description.trim();
       case 'price': return !price || parseFloat(price) <= 0;
-      case 'cost': return !cost || parseFloat(cost) <= 0;
+      case 'cost': return !calculatedCost && decimalInput(cost) == null;
       case 'package': return !packageId;
-      case 'recipes': return selectedRecipes.length === 0;
+      case 'recipes': return false;
       case 'image': return image.trim() && (() => { try { new URL(image); return false; } catch { return true; } })();
       default: return false;
     }
@@ -252,7 +259,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 </Form.Group>
               </Col>
               <Col md={6}>
-                <Form.Group controlId="cost" className="mb-3">
+                <Form.Group controlId="cost" className="mb-3" hidden={calculatedCost}>
                   <Form.Label>
                     {t("cost")} <span className="text-danger">*</span>
                   </Form.Label>
@@ -322,7 +329,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   <div className="product-modal-field-header d-flex align-items-center mb-2">
                     <Form.Label className="mb-0 me-1">
                       <FaUtensils className="me-1" />
-                      {t("recipes")} <span className="text-danger">*</span>
+                      {t("recipes")} ({t("costingOptionalLinks")})
                     </Form.Label>
                     {selectedRecipes.length > 0 && (
                       <span className="badge bg-primary ms-2">
@@ -340,13 +347,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     placeholder={t("chooseRecipe")}
                     closeMenuOnSelect={false}
                     error={isFieldInvalid('recipes') ? t('atLeastOneRecipeRequired') : undefined}
-                    required
-                    helperText={selectedRecipes.length === 0 ? t('selectRecipesHelp') : undefined}
+                    helperText={t('costingLegacyLinksHelp')}
                   />
                 </Form.Group>
               </Col>
             </Row>
           </div>
+          {costingControls}
         </Form>
       </Modal.Body>
       <Modal.Footer className="border-0 pt-3 px-3 px-md-4 product-modal-footer">

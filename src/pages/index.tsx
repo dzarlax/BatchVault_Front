@@ -1,3 +1,5 @@
+import { refreshOrderItemEstimate } from '../utils/orderHelpers';
+import { effectiveProductCost, costIssues, invalidateCosting } from '../utils/costing';
 import React, { useMemo, useCallback, useState } from 'react';
 import { Container, Row, Col, Card, Table, Button, ProgressBar } from 'react-bootstrap';
 import useSWR from 'swr';
@@ -127,12 +129,7 @@ const Dashboard = () => {
   const [clientId, setClientId] = React.useState<number | null>(null);
   const [status, setStatus] = React.useState<string>("");
   const [comment, setComment] = React.useState<string>("");
-  const [items, setItems] = React.useState<Array<{
-    product_id: number;
-    quantity: number;
-    price: number;
-    cost_price: number;
-  }>>([]); 
+  const [items, setItems] = React.useState<OrderItem[]>([]);
 
   // State for status and delete modals
   const [showStatusModal, setShowStatusModal] = React.useState<boolean>(false);
@@ -311,6 +308,7 @@ const Dashboard = () => {
     setItems(
       order.items
         ? order.items.map((item) => ({
+            id: item.id, cost_snapshot: item.cost_snapshot,
             product_id: item.product_id,
             quantity: item.quantity,
             price: item.price,
@@ -331,6 +329,8 @@ const Dashboard = () => {
   };
 
   const handleSaveOrderChanges = async () => {
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -345,9 +345,17 @@ const Dashboard = () => {
           headers: {
             "Content-Type": "application/json",
             'Authorization': `Bearer ${token}`,
+            ...(workspace ? { 'X-Workspace-ID': workspace } : {}),
           },
           body: JSON.stringify(order),
         });
+        if (activeCostWorkspace.current !== context) return;
+        try { await fetcher(`/api/orders/${editingOrder.id}`, { headers: workspace ? { 'X-Workspace-ID': workspace } : {} }); }
+        catch (readError) {
+          if (activeCostWorkspace.current !== context) return;
+          handleCloseOrderModal(); showError(t('costingSavedReadFailed')); mutateOrders(); return;
+        }
+        if (activeCostWorkspace.current !== context) return;
         // Refresh orders data
         mutateOrders();
         mutateDashboardStats(); // Refresh dashboard stats (including recent_orders table)
@@ -355,7 +363,10 @@ const Dashboard = () => {
       }
       handleCloseOrderModal();
     } catch (error) {
-      showError(t('failedToSaveOrder'));
+      if (activeCostWorkspace.current !== context) return;
+      await invalidateCosting(workspace);
+      if (activeCostWorkspace.current !== context) return;
+      showError((error as { status?: number })?.status === 409 ? t('costingQuoteChanged') : error instanceof Error ? error.message : t('failedToSaveOrder'));
     }
   };
 
@@ -364,8 +375,36 @@ const Dashboard = () => {
     const product = products.find((p) => p.id === product_id);
     if (product) {
       const updatedItems = [...items];
-      updatedItems[index] = createOrderItemFromProduct(product);
+      const original = editingOrder?.items.find(row => row.id === items[index].id);
+      if (original && original.product_id === product_id) {
+        updatedItems[index] = { id: original.id, product_id: original.product_id, quantity: updatedItems[index].quantity, price: original.price, cost_price: original.cost_price, cost_snapshot: original.cost_snapshot };
+        setItems(updatedItems);
+        return;
+      }
+      const cost = effectiveProductCost(product);
+      if (cost == null) { showError(costIssues(product.cost_estimate, t)); return; }
+      updatedItems[index] = { ...createOrderItemFromProduct(product), id: items[index].id, cost_source: product.cost_mode || 'manual' };
       setItems(updatedItems);
+    }
+  };
+
+  const activeCostWorkspace = React.useRef({ workspace: selectedWorkspaceId });
+  if (activeCostWorkspace.current.workspace !== selectedWorkspaceId) {
+    activeCostWorkspace.current = { workspace: selectedWorkspaceId };
+  }
+  const handleRefreshItemCost = async (index: number) => {
+    const item = items[index];
+    if (!item || item.cost_snapshot || !selectedWorkspaceId) return;
+    const context = activeCostWorkspace.current;
+    const workspace = context.workspace;
+    try {
+      const patch = await refreshOrderItemEstimate(item, productId => fetcher(`/api/products/${productId}`, { headers: { 'X-Workspace-ID': workspace } }), t);
+      if (activeCostWorkspace.current !== context) return;
+      setItems(current => current.map((row, i) =>
+        i === index && row.id === item.id && row.product_id === item.product_id && !row.cost_snapshot ? { ...row, ...patch } : row
+      ));
+    } catch (error) {
+      if (activeCostWorkspace.current === context) showError(t('costingRefreshFailed'));
     }
   };
 
@@ -843,6 +882,7 @@ const Dashboard = () => {
         setStatus={setStatus}
         setComment={setComment}
         handleProductChange={handleProductChange}
+        handleRefreshItemCost={handleRefreshItemCost}
         handleQuantityChange={handleQuantityChange}
         handleItemChange={handleItemChange}
         handleRemoveItem={handleRemoveItem}

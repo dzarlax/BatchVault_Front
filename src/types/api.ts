@@ -4,6 +4,9 @@
 // ===================== ORDER TYPES =====================
 
 export interface OrderItem {
+  id?: number;
+  cost_snapshot?: CostSnapshot | null;
+  cost_source?: CostMode;
   product_id: number;
   quantity: number;
   price: number;
@@ -50,7 +53,9 @@ export interface Client {
 export interface ProductPackage {
   id: number;
   name: string;
-  weight: number;
+  weight?: number;
+  net_weight_g?: number | null;
+  unit_cost?: number | null;
 }
 
 export interface ProductOption {
@@ -58,7 +63,23 @@ export interface ProductOption {
   recipe?: Recipe;
 }
 
+export type CostMode = 'manual' | 'recipe' | 'assortment';
+export interface CostIssue { code: string; message: string; recipe_id?: number; ingredient_id?: number; }
+export interface CostEstimate {
+  status: 'complete' | 'incomplete'; source: CostMode; total_cost: number | null;
+  content_cost: number | null; packaging_cost: number | null; known_ingredient_cost: number;
+  cost_per_gram: number | null; planned_yield_g?: number | null; net_weight_g?: number | null;
+  components: { recipe_id: number; name: string; quantity_g: number; planned_yield_g: number | null; recipe_cost: number | null; cost_per_gram?: number | null; content_cost: number | null }[];
+  issues: CostIssue[]; calculated_at: string;
+}
+export interface CostSnapshot { version: number; source: CostMode; amount: number; estimate?: CostEstimate; calculated_at: string; }
+export interface ProductCostComponent { recipe_id: number; quantity_g: number; }
+
 export interface Product {
+  cost_mode?: CostMode;
+  cost_recipe_id?: number | null;
+  components?: ProductCostComponent[];
+  cost_estimate?: CostEstimate;
   id: number;
   name: string;
   description?: string;
@@ -121,10 +142,15 @@ export interface RecipeIngredient {
   quantity: string;  // Go expects string, not number!
   unit: string;
   ingredient?: Ingredient;
+  cost_status?: string;
+  calculated_cost?: number;
   ingredientCost?: string;  // Calculated field from backend
 }
 
 export interface Recipe {
+  planned_yield_g?: number | null;
+  total_cost?: number;
+  cost_estimate?: CostEstimate;
   id: number;
   name: string;
   description?: string;

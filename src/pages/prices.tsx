@@ -1,3 +1,4 @@
+import { decimalInput, invalidateCosting } from '../utils/costing';
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
@@ -113,7 +114,7 @@ const Prices = () => {
 
     try {
       const currentDate = new Date().toISOString();
-      const price = parsePositiveDecimal(priceData.price);
+      const price = decimalInput(priceData.price);
       const quantity = parsePositiveDecimal(priceData.quantity);
 
       if (price === null) {
@@ -146,6 +147,7 @@ const Prices = () => {
       }
 
       mutatePrices();
+      await invalidateCosting(selectedWorkspaceId);
     } catch (error) {
       throw error;
     }
