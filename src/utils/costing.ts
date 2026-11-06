@@ -1,11 +1,21 @@
 import { mutate } from 'swr';
-import { CostEstimate, CostMode, Product } from '../types/api';
+import { currentProductType } from './productTypes';
+import { CostEstimate, CostMode, Product, CostSnapshot } from '../types/api';
 
 export interface CostingDraft {
   cost_mode: CostMode;
   cost_recipe_id: number | null;
   components: { recipe_id: number; quantity_g: string }[];
   reviewed: boolean;
+  product_type?: 'standard' | 'assortment';
+  composition_basis?: 'products' | 'legacy_recipes' | null;
+  assortment_components?: { component_product_id: number; quantity_g: string; position: number }[];
+  configuration_version?: number;
+  converting?: boolean;
+  conversionAccepted?: boolean;
+  conversionAcceptedContext?: string;
+  conversionAcceptedEstimate?: string;
+  conversionPreview?: { context: string; estimate: string; complete: boolean };
 }
 export const emptyCostingDraft = (): CostingDraft => ({ cost_mode: 'manual', cost_recipe_id: null, components: [], reviewed: false });
 export const decimalInput = (value: string): number | null => {
@@ -29,15 +39,16 @@ export const validCostingDraft = (draft: CostingDraft, netWeight?: number | null
   const totalMg = rows.reduce((sum, row) => sum + Math.round(Number(decimalInput(row.quantity_g)) * 1000), 0);
   return netWeight == null || totalMg === Math.round(netWeight * 1000);
 };
-export const effectiveProductCost = (product: Pick<Product, 'cost' | 'cost_estimate' | 'cost_mode'>): number | null => {
-  if (product.cost_estimate) return product.cost_estimate.status === 'complete' ? product.cost_estimate.total_cost : null;
+export const effectiveProductCost = (product: Pick<Product, 'cost' | 'cost_estimate' | 'cost_mode'> & Partial<Pick<Product, 'product_type'>>): number | null => {
+  if (!currentProductType(product)) return null;
+  if (product.cost_estimate) { const total = product.cost_estimate.total_cost; return product.cost_estimate.status === 'complete' && total != null && Number.isFinite(total) && total >= 0 ? total : null; }
   if (product.cost_mode === 'recipe' || product.cost_mode === 'assortment') return null;
-  return Number.isFinite(product.cost) ? product.cost : null;
+  return Number.isFinite(product.cost) && product.cost >= 0 ? product.cost : null;
 };
 export const calculatedSnapshot = (snapshot?: { source: string } | null) => snapshot?.source === 'recipe' || snapshot?.source === 'assortment';
 export type CostingTranslate = (key: string, values?: Record<string, unknown>) => string;
 export const costSourceLabel = (source?: string, t?: CostingTranslate) => source === 'recipe' ? (t?.('costingModeRecipe') ?? 'From recipe') : source === 'assortment' ? (t?.('costingModeAssortment') ?? 'Assortment') : (t?.('costingModeManual') ?? 'Manual');
-const knownCostIssues = new Set(['empty_recipe', 'missing_ingredient', 'packaging_in_recipe', 'missing_price', 'invalid_quantity', 'invalid_price_quantity', 'invalid_price', 'incompatible_units', 'amount_out_of_range', 'missing_yield', 'invalid_manual_cost', 'missing_package', 'missing_package_weight', 'missing_package_cost', 'missing_recipe', 'invalid_cost_mode', 'invalid_composition', 'weight_mismatch']);
+const knownCostIssues = new Set(['empty_recipe', 'missing_ingredient', 'packaging_in_recipe', 'missing_price', 'invalid_quantity', 'invalid_price_quantity', 'invalid_price', 'incompatible_units', 'amount_out_of_range', 'missing_yield', 'invalid_manual_cost', 'missing_package', 'missing_package_weight', 'missing_package_cost', 'missing_recipe', 'invalid_cost_mode', 'invalid_composition', 'weight_mismatch', 'missing_component_product', 'missing_primary_recipe', 'invalid_product_type']);
 export const costIssueMessage = (issue: { code?: string; message: string }, t?: CostingTranslate) =>
   t ? t(issue.code && knownCostIssues.has(issue.code) ? `costingIssue_${issue.code}` : 'costingInformationUnavailable') : issue.message;
 export const invalidateCosting = (workspaceId: string | null | undefined) => mutate((key: unknown) =>
@@ -45,3 +56,5 @@ export const invalidateCosting = (workspaceId: string | null | undefined) => mut
   ['/api/products', '/api/recipes', '/api/packages', '/api/prices', '/api/workspace-ingredients'].some(prefix => key[0] === prefix || key[0].startsWith(`${prefix}/`))
 );
 export const costIssues = (estimate?: CostEstimate | null, t?: CostingTranslate) => estimate?.issues.map(issue => costIssueMessage(issue, t)).join('; ') || t?.('costingInformationUnavailable') || 'Cost information is unavailable';
+
+export const supportedCostSnapshot = (snapshot?: CostSnapshot | null): boolean => !snapshot || (snapshot.version === 1 && ['manual', 'recipe', 'assortment'].includes(snapshot.source));

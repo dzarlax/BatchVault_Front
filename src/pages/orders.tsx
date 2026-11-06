@@ -547,6 +547,7 @@ const Orders = () => {
         onSave={editingOrder ? handleSaveOrderChanges : handleCreateOrder}
         clientOptions={clientOptions}
         productOptions={productOptions}
+        products={products}
         statusOptions={statusOptions}
         clientId={clientId}
         status={status}

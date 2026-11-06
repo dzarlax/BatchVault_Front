@@ -74,6 +74,8 @@ declare module 'react-select' {
     valueContainerStyle?: any;
   }
 
+  export const components: { Input: ComponentType<any> };
+
   export type SingleValue<OptionType> = OptionType | null;
 
   const Select: ComponentType<SelectProps>;
