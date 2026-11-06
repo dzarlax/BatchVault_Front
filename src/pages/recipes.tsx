@@ -8,6 +8,7 @@ import RecipeBuilderModal from '../components/modal/Recipe/RecipeBuilderModal';
 import RecipeCalculator from '../components/calculator/RecipeCalculator';
 import RecipeCardSkeleton from '../components/skeletons/RecipeCardSkeleton';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useRouter } from 'next/router';
 import { useAuth, withAuth } from '../utils/authContext';
 import { useNotification } from '../hooks/useNotification';
@@ -18,6 +19,7 @@ import { useWorkspace } from '../utils/workspaceContext';
 import { workspaceFetcher, workspaceKey } from '../utils/workspaceSWR';
 import { WorkspaceIngredient } from '../types/api';
 import { ClearFiltersButton, FilterBar, SearchFilter } from '../components/filters/FilterBar';
+import { advanceEditorOperationScope, commitEditorWrite, createRecipeWithIngredients, EditorOperationScope } from '../utils/editorDraftState';
 
 const Recipes: React.FC = () => {
   const { auth } = useAuth();
@@ -27,6 +29,9 @@ const Recipes: React.FC = () => {
   const router = useRouter();
   const [recipes, setRecipes] = useState<any[]>([]);
   const [recipesWorkspaceId, setRecipesWorkspaceId] = useState<string | null>(null);
+  const [loadedFilter, setLoadedFilter] = useState('');
+  const [filteredReadError, setFilteredReadError] = useState(false);
+  const readVersion = useRef(0);
   const selectedWorkspaceIdRef = useRef(selectedWorkspaceId);
   selectedWorkspaceIdRef.current = selectedWorkspaceId;
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -39,13 +44,44 @@ const Recipes: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showCalculator, setShowCalculator] = useState<boolean>(false);
   const [calculatorRecipe, setCalculatorRecipe] = useState<any>(null);
+  const [editingRecipeNeedsRefresh, setEditingRecipeNeedsRefresh] = useState(false);
+  const editingRecipeNeedsRefreshRef = useRef(false);
+  const recipeRefreshLocks = useRef(new Set<string>());
+  const selectedRecipeRefreshKey = JSON.stringify([selectedWorkspaceId, editingRecipe?.id]);
+  editingRecipeNeedsRefreshRef.current = recipeRefreshLocks.current.has(selectedRecipeRefreshKey);
+  const workspaceScope = useRef<EditorOperationScope | null>(null);
+  workspaceScope.current = advanceEditorOperationScope(workspaceScope.current, selectedWorkspaceId || '');
+  const renderedWorkspaceScope = workspaceScope.current;
+  const editorScope = useRef<EditorOperationScope | null>(null);
+  const nextEditorScope = advanceEditorOperationScope(editorScope.current,
+    `${renderedWorkspaceScope.epoch}:${showModal ? `edit:${editingRecipe?.id}` : 'closed'}:${showCreateModal ? 'create' : 'closed'}`);
+  editorScope.current = nextEditorScope;
+  const renderedEditorScope = nextEditorScope;
+  const resetWorkspaceScope = useRef(renderedWorkspaceScope);
+
+  useEffect(() => {
+    setEditingRecipeNeedsRefresh(recipeRefreshLocks.current.has(selectedRecipeRefreshKey));
+  }, [renderedEditorScope, selectedRecipeRefreshKey]);
+
+  useEffect(() => {
+    if (resetWorkspaceScope.current === renderedWorkspaceScope) return;
+    resetWorkspaceScope.current = renderedWorkspaceScope;
+    readVersion.current++;
+    setShowModal(false);
+    setEditingRecipe(null);
+    setShowCreateModal(false);
+    setShowCalculator(false);
+    setCalculatorRecipe(null);
+    setSelectedRecipeId(null);
+  }, [renderedWorkspaceScope]);
+
 
   // Fetch списков рецептов и ингредиентов
-  const { data: recipeNames } = useSWR(
+  const { data: recipeNames, error: recipesError, mutate: mutateRecipeNames } = useSWR(
     workspaceKey('/api/recipes', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
-  const { data: workspaceIngredients } = useSWR<WorkspaceIngredient[]>(
+  const { data: workspaceIngredients, error: ingredientsError, mutate: mutateIngredients } = useSWR<WorkspaceIngredient[]>(
     workspaceKey('/api/workspace-ingredients', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
@@ -55,30 +91,33 @@ const Recipes: React.FC = () => {
   );
 
   useEffect(() => {
+    readVersion.current++;
+    setFilteredReadError(false);
     if (!isWorkspaceReady || !selectedWorkspaceId) {
       setIsLoading(true);
       return;
     }
     if (filterIngredient) {
-      setIsLoading(true);
-      if (workspaceIngredients === undefined) return;
-      loadRecipes();
-    } else if (recipeNames !== undefined && workspaceIngredients !== undefined) {
+      void loadRecipes();
+    } else if (recipeNames !== undefined) {
       setRecipes(recipeNames || []);
       setRecipesWorkspaceId(selectedWorkspaceId);
+      setLoadedFilter('');
       setIsLoading(false);
+    } else {
+      setIsLoading(!recipesError);
     }
-  }, [filterIngredient, recipeNames, workspaceIngredients, selectedWorkspaceId, isWorkspaceReady]);
+  }, [filterIngredient, recipeNames, recipesError, selectedWorkspaceId, isWorkspaceReady]);
 
   const filteredRecipes = useMemo(() => {
-    if (!isWorkspaceReady || !selectedWorkspaceId || recipesWorkspaceId !== selectedWorkspaceId) return [];
+    if (!isWorkspaceReady || !selectedWorkspaceId || recipesWorkspaceId !== selectedWorkspaceId || loadedFilter !== String(filterIngredient)) return [];
     const normalizedSearch = searchTerm.trim().toLowerCase();
     if (!normalizedSearch) return recipes;
 
     return recipes.filter((recipe) =>
       String(recipe.name || '').toLowerCase().includes(normalizedSearch)
     );
-  }, [isWorkspaceReady, recipesWorkspaceId, recipes, searchTerm, selectedWorkspaceId]);
+  }, [isWorkspaceReady, recipesWorkspaceId, recipes, searchTerm, selectedWorkspaceId, loadedFilter, filterIngredient]);
 
   useEffect(() => {
     if (filteredRecipes.length === 0) {
@@ -94,7 +133,12 @@ const Recipes: React.FC = () => {
 
   const loadRecipes = async () => {
     const workspaceId = selectedWorkspaceId;
-    if (!workspaceId || !isWorkspaceReady) return;
+    const scope = renderedWorkspaceScope;
+    if (!workspaceId || !isWorkspaceReady || workspaceScope.current !== scope) return;
+    const version = ++readVersion.current;
+    const requestedFilter = String(filterIngredient);
+    setFilteredReadError(false);
+    setIsLoading(true);
     const query = new URLSearchParams();
     if (filterIngredient) query.append('ingredient_id', filterIngredient);
 
@@ -113,232 +157,174 @@ const Recipes: React.FC = () => {
         },
       });
 
-      if (response && selectedWorkspaceIdRef.current === workspaceId) {
+      if (response && workspaceScope.current === scope && selectedWorkspaceIdRef.current === workspaceId && readVersion.current === version) {
         setRecipes(response);
         setRecipesWorkspaceId(workspaceId);
+        setLoadedFilter(requestedFilter);
         setIsLoading(false);
       } else {
-        if (selectedWorkspaceIdRef.current === workspaceId) showError(t('failedToLoadRecipes'));
+        if (workspaceScope.current === scope && selectedWorkspaceIdRef.current === workspaceId && readVersion.current === version) { setFilteredReadError(true); setIsLoading(false); }
       }
     } catch (error) {
-      if (selectedWorkspaceIdRef.current === workspaceId) {
+      if (workspaceScope.current === scope && selectedWorkspaceIdRef.current === workspaceId && readVersion.current === version) {
         setIsLoading(false);
-        showError(t('failedToLoadRecipes'));
+        setFilteredReadError(true);
       }
     }
   };
 
+  type RecipeContext = { scope: EditorOperationScope; workspaceId: string; recipeId?: number };
+  const recipeContext = (): RecipeContext => ({
+    scope: renderedEditorScope,
+    workspaceId: selectedWorkspaceId || '',
+    recipeId: showModal ? editingRecipe?.id : undefined,
+  });
+  const isCurrentRecipeContext = (context: RecipeContext) => Boolean(
+    context.workspaceId && editorScope.current === context.scope
+  );
+  const requireEditingRecipeRefresh = (context: RecipeContext) => {
+    if (!isCurrentRecipeContext(context)) return;
+    recipeRefreshLocks.current.add(JSON.stringify([context.workspaceId, context.recipeId]));
+    editingRecipeNeedsRefreshRef.current = true;
+    setEditingRecipeNeedsRefresh(true);
+  };
+  const ensureRecipeMutationAllowed = (context: RecipeContext) => {
+    if (!isCurrentRecipeContext(context)) return false;
+    if (context.recipeId && recipeRefreshLocks.current.has(JSON.stringify([context.workspaceId, context.recipeId]))) throw new Error('Recipe refresh required');
+    if (!auth.isAuthenticated || !auth.token) {
+      void router.push('/auth/signin');
+      throw new Error('Authentication required');
+    }
+    return true;
+  };
+  const recipeHeaders = (context: RecipeContext) => ({
+    'Authorization': `Bearer ${auth.token}`,
+    'Content-Type': 'application/json',
+    'X-Workspace-ID': context.workspaceId,
+  });
+
   const deleteRecipe = async () => {
-    if (!editingRecipe) return;
+    const context = recipeContext();
+    if (!showModal || !context.recipeId || !ensureRecipeMutationAllowed(context)) return;
     try {
-      if (!auth.isAuthenticated || !auth.token) {
-        router.push('/auth/signin');
-        return;
-      }
-
-      const response = await fetcher(`/api/recipes/${editingRecipe.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await fetcher(`/api/recipes/${context.recipeId}`, {
+        method: 'DELETE', headers: recipeHeaders(context),
       });
-
+      if (!isCurrentRecipeContext(context)) return;
       if (response) {
-        loadRecipes();
+        void loadRecipes();
         setShowModal(false);
         success(t('recipeDeleted'));
-      } else {
-        showError(t('failedToDeleteRecipe'));
-      }
+      } else showError(t('failedToDeleteRecipe'));
     } catch (error) {
-      showError(t('failedToDeleteRecipe'));
+      if (isCurrentRecipeContext(context)) showError(t('failedToDeleteRecipe'));
     }
   };
 
   const cloneRecipe = async () => {
-    if (!editingRecipe) return;
-
-    if (!auth.isAuthenticated || !auth.token) {
-      router.push('/auth/signin');
-      return;
-    }
-
-    // Инициализация поля recipe_ingredients как пустого массива, если оно отсутствует
+    const context = recipeContext();
+    if (!showModal || !context.recipeId || !ensureRecipeMutationAllowed(context)) return;
     const recipeIngredients = editingRecipe.recipe_ingredients || [];
-
     if (!Array.isArray(recipeIngredients)) {
       showError(t('invalidRecipeFormat'));
       return;
     }
-
-    // Создаем копию рецепта с новым именем
-    const response = await fetcher('/api/recipes', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-        'Content-Type': 'application/json',
-      },
+    const request = {
+      headers: recipeHeaders(context),
       body: JSON.stringify({ name: `${editingRecipe.name} (Copy)`, planned_yield_g: editingRecipe.planned_yield_g ?? null }),
-    });
-
-    if (response) {
-      const newRecipe = response;
-
-      // Добавляем ингредиенты в новый рецепт
-      for (const ingredient of recipeIngredients) {
-        if (ingredient.ingredient_id) {  // Используем правильный идентификатор ингредиента
-          await fetcher(`/api/recipes/${newRecipe.id}/ingredients`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${auth.token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ingredient_id: ingredient.ingredient_id,  // Используем поле ingredient_id
-              quantity: ingredient.quantity,
-              unit: ingredient.unit,
-            }),
-          });
-        } else {
-          console.warn('Missing ingredient ID:', ingredient);
-        }
-      }
-
-      loadRecipes();
+      ingredientBodies: recipeIngredients.filter(ingredient => ingredient.ingredient_id).map(ingredient => JSON.stringify({
+        ingredient_id: ingredient.ingredient_id, quantity: ingredient.quantity, unit: ingredient.unit,
+      })),
+    };
+    try {
+      await createRecipeWithIngredients(request, fetcher);
+      if (!isCurrentRecipeContext(context)) return;
+      void loadRecipes();
       setShowModal(false);
       success(t('recipeCloned'));
-    } else {
+    } catch (error) {
+      if (!isCurrentRecipeContext(context)) return;
       showError(t('failedToCloneRecipe'));
+      throw error;
     }
   };
 
-  const refreshEditingRecipe = async (recipeId: number) => {
+  const refreshEditingRecipe = async (recipeId: number, context = recipeContext()) => {
+    if (!isCurrentRecipeContext(context) || context.recipeId !== recipeId) return;
     if (!auth.isAuthenticated || !auth.token) {
-      router.push('/auth/signin');
+      void router.push('/auth/signin');
       throw new Error('Authentication required');
     }
-
-    const updatedRecipe = await fetcher(`/api/recipes/${recipeId}`, {
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-      },
-    });
-
+    const updatedRecipe = await fetcher(`/api/recipes/${recipeId}`, { headers: recipeHeaders(context) });
+    if (!isCurrentRecipeContext(context)) return;
+    if (!updatedRecipe || updatedRecipe.id !== recipeId) throw new Error('Recipe refresh failed');
     setEditingRecipe(updatedRecipe);
+    recipeRefreshLocks.current.delete(JSON.stringify([context.workspaceId, context.recipeId]));
+    editingRecipeNeedsRefreshRef.current = false;
+    setEditingRecipeNeedsRefresh(false);
     await loadRecipes();
   };
 
-  const addIngredientToEditingRecipe = async (ingredient: {
-    ingredient_id: number;
-    quantity: string;
-    unit: string;
-  }) => {
-    if (!editingRecipe) return;
+  const refreshAfterIngredientWrite = async (context: RecipeContext) => {
+    await refreshEditingRecipe(context.recipeId!, context);
+    if (!isCurrentRecipeContext(context)) return;
+    await invalidateCosting(context.workspaceId);
+  };
 
-    if (!auth.isAuthenticated || !auth.token) {
-      router.push('/auth/signin');
-      throw new Error('Authentication required');
-    }
-
-    await fetcher(`/api/recipes/${editingRecipe.id}/ingredients`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(ingredient),
+  const addIngredientToEditingRecipe = async (ingredient: { ingredient_id: number; quantity: string; unit: string }) => {
+    const context = recipeContext();
+    if (!showModal || !context.recipeId || !ensureRecipeMutationAllowed(context)) return;
+    await commitEditorWrite({
+      write: () => fetcher(`/api/recipes/${context.recipeId}/ingredients`, {
+        method: 'POST', headers: recipeHeaders(context), body: JSON.stringify(ingredient),
+      }),
+      acknowledge: () => undefined,
+      refresh: () => refreshAfterIngredientWrite(context),
+      requireRefresh: () => requireEditingRecipeRefresh(context),
+      isCurrent: () => isCurrentRecipeContext(context),
     });
-
-    await refreshEditingRecipe(editingRecipe.id);
-    await invalidateCosting(selectedWorkspaceId);
   };
 
   const deleteIngredientFromEditingRecipe = async (ingredientId: number) => {
-    if (!editingRecipe) return;
-
-    if (!auth.isAuthenticated || !auth.token) {
-      router.push('/auth/signin');
-      throw new Error('Authentication required');
-    }
-
-    await fetcher(`/api/recipes/${editingRecipe.id}/ingredients/${ingredientId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-        'Content-Type': 'application/json',
-      },
+    const context = recipeContext();
+    if (!showModal || !context.recipeId || !ensureRecipeMutationAllowed(context)) return;
+    await commitEditorWrite({
+      write: () => fetcher(`/api/recipes/${context.recipeId}/ingredients/${ingredientId}`, {
+        method: 'DELETE', headers: recipeHeaders(context),
+      }),
+      acknowledge: () => undefined,
+      refresh: () => refreshAfterIngredientWrite(context),
+      requireRefresh: () => requireEditingRecipeRefresh(context),
+      isCurrent: () => isCurrentRecipeContext(context),
     });
-
-    await refreshEditingRecipe(editingRecipe.id);
-    await invalidateCosting(selectedWorkspaceId);
   };
 
   const handleCreateRecipe = async (name: string, ingredients: any[], plannedYield?: number | null) => {
+    const context = recipeContext();
+    if (!showCreateModal || !ensureRecipeMutationAllowed(context)) return;
+    const request = {
+      headers: recipeHeaders(context),
+      body: JSON.stringify({ name, planned_yield_g: plannedYield ?? null }),
+      ingredientBodies: ingredients.map(ingredient => JSON.stringify({
+        ingredient_id: ingredient.id, quantity: ingredient.quantity, unit: ingredient.unit.value,
+      })),
+    };
     try {
-      if (!auth.isAuthenticated || !auth.token) {
-        router.push('/auth/signin');
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetcher('/api/recipes', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, planned_yield_g: plannedYield ?? null }),
-      });
-
-      if (response) {
-        const createdRecipe = response;
-        const recipeId = createdRecipe.id;
-
-        try {
-          for (const ingredient of ingredients) {
-            const ingredientResponse = await fetcher(`/api/recipes/${recipeId}/ingredients`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${auth.token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                ingredient_id: ingredient.id,
-                quantity: ingredient.quantity,
-                unit: ingredient.unit.value,
-              }),
-            });
-
-            if (!ingredientResponse) {
-              throw new Error('Failed to add ingredient');
-            }
-          }
-        } catch (ingredientError) {
-          await fetcher(`/api/recipes/${recipeId}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${auth.token}`,
-              'Content-Type': 'application/json',
-            },
-          }).catch(() => undefined);
-
-          showError(t('failedToAddIngredient'));
-          throw new Error('Failed to add ingredient');
-        }
-
-        loadRecipes();
-        setShowCreateModal(false);
-        success(t('recipeCreated'));
-      } else {
-        showError(t('failedToCreateRecipe'));
-        throw new Error('Failed to create recipe');
-      }
+      await createRecipeWithIngredients(request, fetcher);
+      if (!isCurrentRecipeContext(context)) return;
+      void loadRecipes();
+      setShowCreateModal(false);
+      success(t('recipeCreated'));
     } catch (error) {
-      if (!(error instanceof Error && error.message === 'Failed to add ingredient')) {
-        showError(t('failedToCreateRecipe'));
-      }
+      if (!isCurrentRecipeContext(context)) return;
+      showError(t(error instanceof Error && error.message === 'Failed to add ingredient' ? 'failedToAddIngredient' : 'failedToCreateRecipe'));
       throw error;
     }
+  };
+
+  const handleYieldSaved = (updated: any) => {
+    const context = recipeContext();
+    if (isCurrentRecipeContext(context) && showModal && updated?.id === context.recipeId) setEditingRecipe(updated);
   };
 
   const clearFilters = () => {
@@ -352,6 +338,12 @@ const Recipes: React.FC = () => {
   );
 
   const hasActiveFilters = searchTerm.trim() || filterIngredient;
+  const hasLoadedRecipes = recipesWorkspaceId === selectedWorkspaceId && loadedFilter === String(filterIngredient);
+  const hasReadError = filteredReadError || recipesError || ingredientsError;
+  const referencesUnavailable = !workspaceIngredients || Boolean(ingredientsError);
+  const retryReads = () => {
+    void Promise.allSettled([mutateRecipeNames(), mutateIngredients(), ...(filterIngredient ? [loadRecipes()] : [])]);
+  };
   const ingredientFilterLabel = filterIngredient
     ? ingredients?.find((ingredient: any) => ingredient.id === parseInt(filterIngredient))?.name
     : '';
@@ -441,6 +433,7 @@ const Recipes: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
+            disabled={referencesUnavailable}
             onClick={() => {
               setEditingRecipe(recipe);
               setShowModal(true);
@@ -473,13 +466,14 @@ const Recipes: React.FC = () => {
         <Button
           className="btn btn-primary recipe-page-add-button"
           onClick={() => setShowCreateModal(true)}
+          disabled={referencesUnavailable}
         >
           <FaPlus className="me-2" />
           {t('addRecipe')}
         </Button>
       </div>
 
-      <FilterBar className="recipe-filter-strip">
+      <FilterBar className="recipe-filter-strip" mobileCollapsible activeCount={[searchTerm.trim(), filterIngredient].filter(Boolean).length} summary={[searchTerm.trim(), ingredientFilterLabel].filter(Boolean).join(' · ')} onClear={clearFilters}>
         <SearchFilter
           label={t('searchRecipes')}
           value={searchTerm}
@@ -503,6 +497,7 @@ const Recipes: React.FC = () => {
                 : []
             }
             isClearable
+            isDisabled={referencesUnavailable}
             placeholder={t('allIngredients')}
             label={t('ingredient')}
           />
@@ -517,8 +512,10 @@ const Recipes: React.FC = () => {
         />
       </FilterBar>
 
+      {hasReadError && <ErrorState message={t(ingredientsError && !recipesError && !filteredReadError ? 'uiRecipeReferencesUnavailable' : 'failedToLoadRecipes')} compact={hasLoadedRecipes} onRetry={retryReads} />}
+
       {/* Recipes Grid */}
-      {isLoading ? (
+      {!hasLoadedRecipes && hasReadError ? null : isLoading && !hasLoadedRecipes ? (
         <div className="recipe-workbench recipe-workbench-loading">
           {Array.from({ length: 6 }).map((_, index) => (
             <RecipeCardSkeleton key={index} />
@@ -528,8 +525,8 @@ const Recipes: React.FC = () => {
         <EmptyState
           type="recipes"
           message={hasActiveFilters ? t('noRecipesFound') : t('noRecipes')}
-          actionLabel={t('addRecipe')}
-          onAction={() => setShowCreateModal(true)}
+          actionLabel={hasActiveFilters ? t('clear') : !referencesUnavailable ? t('addRecipe') : undefined}
+          onAction={hasActiveFilters ? clearFilters : () => setShowCreateModal(true)}
         />
       ) : (
         <div className="recipe-workbench">
@@ -586,7 +583,10 @@ const Recipes: React.FC = () => {
         t={t}
         onDeleteRecipe={deleteRecipe}
         onCloneRecipe={cloneRecipe}
-        onYieldSaved={updated => { setEditingRecipe(updated); }}
+        onYieldSaved={handleYieldSaved}
+        refreshRequired={editingRecipeNeedsRefresh || editingRecipeNeedsRefreshRef.current}
+        onRefreshRequired={() => requireEditingRecipeRefresh(recipeContext())}
+        onRefresh={() => editingRecipe?.id ? refreshEditingRecipe(editingRecipe.id) : Promise.resolve()}
         onAddIngredientToRecipe={addIngredientToEditingRecipe}
         onDeleteIngredientFromRecipe={deleteIngredientFromEditingRecipe}
       />

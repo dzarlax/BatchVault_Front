@@ -7,6 +7,7 @@ import { Button, Col } from 'react-bootstrap';
 import ClientModal from '../components/modal/Clients/ClientModal';
 import ClientCardSkeleton from '../components/skeletons/ClientCardSkeleton';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { FaPlus, FaUsers, FaEdit } from 'react-icons/fa';
 import { useAuth } from '../utils/authContext';
 import { useNotification } from '../hooks/useNotification';
@@ -21,7 +22,7 @@ const Clients = ({ mapboxToken }) => {
   const { auth } = useAuth();
   const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
   const { success, error: showError } = useNotification();
-  const { data: clients, mutate } = useSWR<Client[]>(
+  const { data: clients, mutate, error: clientsError } = useSWR<Client[]>(
     workspaceKey('/api/clients', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
@@ -124,20 +125,20 @@ const Clients = ({ mapboxToken }) => {
   };
 
   const filteredClients = clients?.filter(client =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.telegram?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.instagram?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.source?.toLowerCase().includes(searchTerm.toLowerCase())
+    client.name.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+    client.surname.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+    client.telegram?.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+    client.instagram?.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+    client.phone?.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+    client.address?.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
+    client.source?.toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
 
   const clearSearch = () => {
     setSearchTerm('');
   };
 
-  const isLoading = !clients;
+  const isLoading = !clients && !clientsError;
 
   return (
     <div className="page-container">
@@ -150,7 +151,7 @@ const Clients = ({ mapboxToken }) => {
           </h1>
           {!isLoading && (
             <p className="page-subtitle">
-              {t('total')}: {clients.length} {t('clients').toLowerCase()}
+              {t('total')}: {clients?.length || 0} {t('clients').toLowerCase()}
               {filteredClients && filteredClients.length !== clients.length && (
                 <span className="text-tertiary"> / {filteredClients.length} {t('filtered').toLowerCase()}</span>
               )}
@@ -167,7 +168,7 @@ const Clients = ({ mapboxToken }) => {
       </div>
 
       {/* Search Section */}
-      <FilterBar>
+      <FilterBar mobileCollapsible activeCount={searchTerm.trim() ? 1 : 0} summary={searchTerm.trim()} onClear={clearSearch}>
         <SearchFilter
           label={t('search')}
           value={searchTerm}
@@ -178,13 +179,15 @@ const Clients = ({ mapboxToken }) => {
         <ClearFiltersButton
           label={t('clear')}
           onClick={clearSearch}
-          visible={!!searchTerm}
+          visible={!!searchTerm.trim()}
         />
       </FilterBar>
 
+      {clientsError && <ErrorState message={t('failedToLoadClients')} compact={Boolean(clients)} onRetry={() => { void mutate(); }} />}
+
       {/* Clients Grid */}
       <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-        {isLoading ? (
+        {!clients && clientsError ? null : isLoading ? (
           Array.from({ length: 6 }).map((_, index) => (
             <Col key={index}>
               <ClientCardSkeleton />
@@ -194,9 +197,9 @@ const Clients = ({ mapboxToken }) => {
           <div className="col-12">
             <EmptyState
               type="clients"
-              message={searchTerm ? t('noClientsFound') : t('noClients')}
-              actionLabel={t('addClient')}
-              onAction={() => openClientModal()}
+              message={searchTerm.trim() ? t('noClientsFound') : t('noClients')}
+              actionLabel={t(searchTerm.trim() ? 'clear' : 'addClient')}
+              onAction={searchTerm.trim() ? clearSearch : () => openClientModal()}
             />
           </div>
         ) : (
@@ -208,7 +211,7 @@ const Clients = ({ mapboxToken }) => {
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => openClientModal(client)}
-                  title={t('edit')}
+                  title={t('edit')} aria-label={`${t('edit')} ${client.name} ${client.surname}`}
                 >
                   <FaEdit size={14} />
                 </button>

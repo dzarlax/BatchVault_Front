@@ -35,7 +35,7 @@ const Products = () => {
     workspaceKey('/api/products', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
-  const { data: recipes, error: recipesError } = useSWR<Recipe[]>(
+  const { data: recipes, error: recipesError, mutate: mutateRecipes } = useSWR<Recipe[]>(
     workspaceKey('/api/recipes', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
@@ -51,14 +51,6 @@ const Products = () => {
   const [savedProductId, setSavedProductId] = useState<number | null>(null);
   const baseline = useRef<string | null>(null);
   const [conversionChoice, setConversionChoice] = useState(false);
-  const [isCompact, setIsCompact] = useState(false);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 991.98px)');
-    const update = () => setIsCompact(media.matches);
-    update(); media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const operation = useRef<object | null>(null);
   const scope = useRef({ id: selectedWorkspaceId, epoch: 0 });
@@ -113,7 +105,7 @@ const Products = () => {
   }, [products, selectedPackage, selectedProduct, selectedRecipe, typeFilter]);
 
   const handleEditProduct = (product: Product) => {
-    if (operation.current || !recipes || !packages) {
+    if (operation.current || !recipes || !packages || recipesError || packagesError) {
       console.warn('Recipes or packages data not loaded yet');
       return;
     }
@@ -284,19 +276,7 @@ const Products = () => {
   const hasError = productsError || recipesError || packagesError;
   
   // Check loading state.
-  const isLoading = !products || !recipes || !packages;
-
-  // Show a recoverable loading error.
-  if (hasError) {
-    return (
-      <ErrorState 
-        message={t('failedToLoadProducts')} 
-        onRetry={() => {
-          mutateProducts();
-        }} 
-      />
-    );
-  }
+  const isLoading = !products && !productsError;
 
   return (
     <div className="page-container products-page">
@@ -319,6 +299,7 @@ const Products = () => {
         <Button
           className="btn btn-primary"
           onClick={openNewProduct}
+          disabled={!recipes || !packages || Boolean(recipesError || packagesError)}
         >
           <FaPlus className="me-2" />
           {t('addProduct')}
@@ -326,12 +307,7 @@ const Products = () => {
       </div>
 
       {/* Filter Section */}
-      <div className="products-filter-summary">
-        {isCompact && <Button variant="outline-secondary" className="products-filters-toggle" aria-controls="product-filters" aria-expanded={filtersExpanded} onClick={() => setFiltersExpanded(value => !value)}>{t('productFilters', { count: activeFilterCount })}</Button>}
-        {hasActiveFilters && <><span>{filterSummary}</span><ClearFiltersButton label={t('clear')} onClick={clearFilters} visible /></>}
-      </div>
-      <div id="product-filters" className="product-filters-panel" hidden={isCompact && !filtersExpanded}>
-      <FilterBar className="products-filter-bar">
+      <FilterBar className="products-filter-bar" mobileCollapsible activeCount={activeFilterCount} summary={filterSummary} onClear={clearFilters}>
         <div className="filter-group"><SelectDropdown inputId="product-type-filter" label={t('productType')}
           options={[{ value: 'standard', label: t('productTypeStandard') }, { value: 'assortment', label: t('productTypeAssortment') }]}
           value={typeFilter ? { value: typeFilter, label: t(typeFilter === 'standard' ? 'productTypeStandard' : 'productTypeAssortment') } : null}
@@ -356,7 +332,6 @@ const Products = () => {
             label={t('product')}
           />
         </div>
-      </FilterBar>
 
       {!isLoading && (
         <div className="package-chip-strip" aria-label={t('package')}>
@@ -390,6 +365,7 @@ const Products = () => {
             type="button"
             className="package-chip package-chip-add"
             onClick={() => setShowPackageModal(true)}
+            disabled={Boolean(packagesError)}
             title={t('addPackage')}
             aria-label={t('addPackage')}
           >
@@ -398,10 +374,12 @@ const Products = () => {
         </div>
       )}
 
-      </div>
+      </FilterBar>
+
+      {hasError && <ErrorState message={t('failedToLoadProducts')} compact={Boolean(products)} onRetry={() => { void Promise.allSettled([mutateProducts(), mutateRecipes(), mutatePackages()]); }} />}
 
       {/* Products Grid */}
-      {isLoading ? (
+      {!products && hasError ? null : isLoading ? (
         <div className="products-grid">
           {Array.from({ length: 8 }).map((_, index) => (
             <ProductCardSkeleton key={index} />
@@ -410,9 +388,9 @@ const Products = () => {
       ) : filteredProducts.length === 0 ? (
         <EmptyState
           type="products"
-          message={t('noProductsFound')}
-          actionLabel={t('addProduct')}
-          onAction={openNewProduct}
+          message={t(hasActiveFilters ? 'noProductsFound' : 'noProducts')}
+          actionLabel={hasActiveFilters ? t('clear') : recipes && packages && !recipesError && !packagesError ? t('addProduct') : undefined}
+          onAction={hasActiveFilters ? clearFilters : openNewProduct}
         />
       ) : (
         <div className="products-grid">
@@ -422,6 +400,7 @@ const Products = () => {
                 product={product}
                 recipes={recipes || []}
                 packages={packages || []}
+                editDisabled={!recipes || !packages || Boolean(recipesError || packagesError)}
                 onEdit={handleEditProduct}
               />
             </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Modal, Button } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 
@@ -33,11 +33,12 @@ const ClientModal: React.FC<ClientModalProps> = ({
   getMapLink
 }) => {
   const { t } = useTranslation('common');
+  const titleId = `order-client-modal-title-${useId()}`;
 
   return (
-    <Modal show={show} onHide={onClose}>
-      <Modal.Header closeButton>
-        <Modal.Title>{t('clientDetails')}</Modal.Title>
+    <Modal show={show} onHide={onClose} className="ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
+        <Modal.Title id={titleId}>{t('clientDetails')}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {client && (

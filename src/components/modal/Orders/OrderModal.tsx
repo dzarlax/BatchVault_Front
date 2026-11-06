@@ -7,6 +7,7 @@ import { FaTimes } from 'react-icons/fa';
 import useTranslation from 'next-translate/useTranslation';
 import SelectDropdown from '../../SelectDropdown';
 import { useWorkspace } from '../../../utils/workspaceContext';
+import { orderEditorIsDirty, orderEditorSnapshot } from '../../../utils/editorDraftState';
 
 
 
@@ -68,6 +69,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
 }) => {
   const { t } = useTranslation('common');
   const { selectedCurrency, selectedWorkspaceId } = useWorkspace();
+  const titleId = React.useId();
+  const baseline = React.useRef<string | null>(null);
+  const draftValues = { clientId, status, comment, items };
   const [isBusy, setIsBusy] = React.useState(false);
   const busy = React.useRef(false);
   const operationVersion = React.useRef(0);
@@ -88,12 +92,16 @@ const OrderModal: React.FC<OrderModalProps> = ({
   };
 
   React.useEffect(() => {
+    if (show && baseline.current == null) {
+      baseline.current = orderEditorSnapshot(draftValues);
+    }
     if (!show) {
+      baseline.current = null;
       operationVersion.current++;
       busy.current = false;
       setIsBusy(false);
     }
-  }, [show]);
+  }, [show, clientId, status, comment, items]);
 
   React.useEffect(() => {
     if (previousWorkspace.current !== selectedWorkspaceId) {
@@ -106,12 +114,16 @@ const OrderModal: React.FC<OrderModalProps> = ({
   }, [selectedWorkspaceId, onClose]);
 
   React.useEffect(() => () => { operationVersion.current++; }, []);
-  const closeWhenIdle = () => { if (!busy.current) onClose(); };
+  const closeWhenIdle = () => {
+    if (busy.current) return;
+    if (orderEditorIsDirty(baseline.current, draftValues) && !window.confirm(t('uiDiscardUnsaved'))) return;
+    onClose();
+  };
 
   return (
-    <Modal show={show} onHide={closeWhenIdle} backdrop={isBusy ? "static" : true} keyboard={!isBusy} size="lg">
-      <Modal.Header closeButton={!isBusy}>
-        <Modal.Title>{t('orderDetails')}</Modal.Title>
+    <Modal show={show} onHide={closeWhenIdle} backdrop={isBusy ? "static" : true} keyboard={!isBusy} size="lg" className="ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton={!isBusy} closeLabel={t('close')}>
+        <Modal.Title id={titleId}>{t('orderDetails')}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form>

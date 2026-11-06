@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { Modal, Form, Button, Row, Col, Alert, Badge } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 import { FaPlus, FaTag, FaUtensils } from 'react-icons/fa';
@@ -27,6 +27,7 @@ const AddIngredientModal: React.FC<AddIngredientModalProps> = ({
   existingIngredients = [] 
 }) => {
   const { t } = useTranslation('common');
+  const titleId = `ingredient-modal-title-${useId()}`;
   const [ingredientType, setIngredientType] = useState('');
   const [ingredientName, setIngredientName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -178,9 +179,9 @@ const AddIngredientModal: React.FC<AddIngredientModalProps> = ({
   };
 
   return (
-    <Modal show={show} onHide={onClose} size="lg" className="add-ingredient-modal">
-      <Modal.Header closeButton>
-        <Modal.Title>
+    <Modal show={show} onHide={onClose} size="lg" className="add-ingredient-modal ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
+        <Modal.Title id={titleId}>
           <FaPlus className="me-2 text-primary" />
           {t('addIngredient')}
         </Modal.Title>

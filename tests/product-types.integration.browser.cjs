@@ -19,6 +19,8 @@ test('real backend: create fixed assortment, record order, then change costing w
       assert.ok(result.ok(), `${method} ${endpoint}: ${result.status()} ${await result.text()}`);
       return result.json();
     };
+    const workspace = await request('GET', '/workspaces/current');
+    assert.ok(workspace.currency, 'The synthetic workspace must declare its currency');
     await context.addInitScript(token => { localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify({ username: 'costing-qa' })); }, token);
     const name = `QA New Assortment ${Date.now()}`;
     const page = await context.newPage();
@@ -39,7 +41,7 @@ test('real backend: create fixed assortment, record order, then change costing w
       await page.getByRole('option', { name: `QA Source ${i + 1}`, exact: true }).click();
       await dialog.locator(`#component-grams-${i}`).fill('50');
     }
-    await expect(dialog.getByRole('region', { name: strings.costingTitle })).toContainText('660.00 RSD');
+    await expect(dialog.getByRole('region', { name: strings.costingTitle })).toContainText(`660.00 ${workspace.currency}`);
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     const created = (await request('GET', '/products')).find(product => product.name === name);

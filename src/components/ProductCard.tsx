@@ -12,9 +12,10 @@ interface ProductCardProps {
   recipes: Recipe[];
   packages: ProductPackage[];
   onEdit: (product: Product) => void;
+  editDisabled?: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, recipes, packages, onEdit }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, recipes, packages, onEdit, editDisabled = false }) => {
   const { t } = useTranslation('common');
   const { selectedCurrency } = useWorkspace();
   const currentCost = effectiveProductCost(product);
@@ -30,7 +31,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, recipes, packages, o
           <h3 className="product-card-title">{product.name}</h3>
             <ProductComposition product={product} compact packages={packages} />
         </div>
-        <button className="btn btn-ghost btn-sm product-card-edit" onClick={() => onEdit(product)} title={t('edit')} aria-label={`${t('edit')} ${product.name}`}>
+        <button className="btn btn-ghost btn-sm product-card-edit" disabled={editDisabled} onClick={() => onEdit(product)} title={t('edit')} aria-label={`${t('edit')} ${product.name}`}>
           <FaEdit size={14} />
         </button>
       </div>

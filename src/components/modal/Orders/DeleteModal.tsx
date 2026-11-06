@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { Modal, Button, Spinner, Alert } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 
@@ -14,6 +14,7 @@ const DeleteModal: React.FC<DeleteModalProps> = ({
   onDelete
 }) => {
   const { t } = useTranslation('common');
+  const titleId = `order-delete-modal-title-${useId()}`;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,9 +32,9 @@ const DeleteModal: React.FC<DeleteModalProps> = ({
   };
 
   return (
-    <Modal show={show} onHide={onClose}>
-      <Modal.Header closeButton>
-        <Modal.Title>{t('confirmDelete')}</Modal.Title>
+    <Modal show={show} onHide={onClose} className="ui-workflow-modal" aria-labelledby={titleId}>
+      <Modal.Header closeButton closeLabel={t('close')}>
+        <Modal.Title id={titleId}>{t('confirmDelete')}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}

@@ -7,6 +7,7 @@ import { FaExclamationTriangle, FaLayerGroup, FaPlus, FaTrash } from 'react-icon
 import { WorkspaceIngredient } from '../../../types/api';
 import SelectDropdown from '../../../components/SelectDropdown';
 import { formatCount } from '../../../utils/pluralize';
+import { acknowledgeRecipeEditorSave, advanceEditorOperationScope, commitEditorWrite, EditorOperationScope, recipeEditorHasPendingIngredient, recipeEditorIsDirty, recipeEditorSnapshot, RecipeEditorSnapshot } from '../../../utils/editorDraftState';
 import {
   getWorkspaceIngredientLabel,
   resolveWorkspaceIngredientUnits,
@@ -48,10 +49,13 @@ type RecipeBuilderModalProps = {
   recipe?: any;
   onCreateRecipe?: (name: string, ingredients: DraftIngredient[], plannedYield?: number | null) => Promise<void>;
   onYieldSaved?: (recipe: any) => void;
+  refreshRequired?: boolean;
+  onRefresh?: () => Promise<void>;
+  onRefreshRequired?: () => void;
   onAddIngredientToRecipe?: (ingredient: { ingredient_id: number; quantity: string; unit: string }) => Promise<void>;
   onDeleteIngredientFromRecipe?: (ingredientId: number) => Promise<void>;
-  onDeleteRecipe?: () => void;
-  onCloneRecipe?: () => void;
+  onDeleteRecipe?: () => void | Promise<void>;
+  onCloneRecipe?: () => void | Promise<void>;
 };
 
 const getRecipeIngredients = (recipe: any): RecipeIngredientRow[] => (
@@ -69,7 +73,7 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   workspaceIngredients = [],
   t,
   recipe,
-  onCreateRecipe, onYieldSaved,
+  onCreateRecipe, onYieldSaved, refreshRequired = false, onRefresh, onRefreshRequired,
   onAddIngredientToRecipe,
   onDeleteIngredientFromRecipe,
   onDeleteRecipe,
@@ -79,17 +83,6 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   const [recipeName, setRecipeName] = useState('');
   const [plannedYield, setPlannedYield] = useState('');
   const { selectedWorkspaceId } = useWorkspace();
-  useEffect(() => { setPlannedYield(recipe?.planned_yield_g == null ? '' : String(recipe.planned_yield_g)); }, [show, recipe?.id, recipe?.planned_yield_g, selectedWorkspaceId]);
-  const saveYield = async () => {
-    const value = plannedYield.trim() ? decimalInput(plannedYield) : null;
-    if (plannedYield.trim() && (value == null || value <= 0)) { setFormError(t('costingYieldPositive')); return; }
-    setIsSaving(true); setFormError('');
-    try {
-      const updated = await fetcher(`/api/recipes/${recipe.id}`, { method: 'PATCH', headers: { 'X-Workspace-ID': selectedWorkspaceId }, body: JSON.stringify({ planned_yield_g: value }) });
-      onYieldSaved?.(updated); await invalidateCosting(selectedWorkspaceId);
-    } catch (err) { setFormError(t('costingYieldSaveFailed')); }
-    finally { setIsSaving(false); }
-  };
   const [draftIngredients, setDraftIngredients] = useState<DraftIngredient[]>([]);
   const [ingredientId, setIngredientId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -97,6 +90,91 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   const [formError, setFormError] = useState('');
   const [ingredientError, setIngredientError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [yieldRefreshRequired, setYieldRefreshRequired] = useState(false);
+  const needsRefresh = refreshRequired || yieldRefreshRequired;
+  const titleId = React.useId();
+  const baseline = React.useRef<RecipeEditorSnapshot | null>(null);
+  const busy = React.useRef(false);
+  const operationVersion = React.useRef(0);
+  const previousWorkspace = React.useRef(selectedWorkspaceId);
+  const operationScope = React.useRef<EditorOperationScope | null>(null);
+  operationScope.current = advanceEditorOperationScope(operationScope.current, JSON.stringify([selectedWorkspaceId, show, mode, recipe?.id]));
+  const openRecipe = React.useRef<string | null>(null);
+  const entryIngredient = React.useRef('');
+  const draftValues = {
+    mode, name: recipeName, plannedYield, ingredients: draftIngredients,
+    entry: { ingredientId, quantity, unit: unit?.value || '' },
+  };
+
+  const canDiscard = () => !busy.current && (
+    !recipeEditorIsDirty(baseline.current, draftValues) || window.confirm(t('uiDiscardUnsaved'))
+  );
+  const requestClose = () => { if (canDiscard()) onHide(); };
+  const beginOperation = () => {
+    if (busy.current) return null;
+    busy.current = true;
+    setIsSaving(true);
+    const version = ++operationVersion.current;
+    const scope = operationScope.current;
+    return {
+      isCurrent: () => operationVersion.current === version && operationScope.current === scope,
+      finish: () => {
+        if (operationVersion.current !== version) return;
+        busy.current = false;
+        setIsSaving(false);
+      },
+    };
+  };
+
+  const saveYield = async () => {
+    if (busy.current || needsRefresh) return;
+    const submittedYield = plannedYield;
+    const value = submittedYield.trim() ? decimalInput(submittedYield) : null;
+    if (submittedYield.trim() && (value == null || value <= 0)) { setFormError(t('costingYieldPositive')); return; }
+    const operation = beginOperation();
+    if (!operation) return;
+    setFormError('');
+    try {
+      await commitEditorWrite({
+        write: () => fetcher(`/api/recipes/${recipe.id}`, { method: 'PATCH', headers: { 'X-Workspace-ID': selectedWorkspaceId }, body: JSON.stringify({ planned_yield_g: value }) }),
+        acknowledge: updated => {
+          baseline.current = acknowledgeRecipeEditorSave(baseline.current, { plannedYield: submittedYield });
+          onYieldSaved?.(updated);
+        },
+        refresh: () => invalidateCosting(selectedWorkspaceId),
+        requireRefresh: () => {
+          setYieldRefreshRequired(true);
+          onRefreshRequired?.();
+        },
+        isCurrent: operation.isCurrent,
+      });
+    } catch (err) {
+      if (operation.isCurrent()) setFormError(t('costingYieldSaveFailed'));
+    } finally { operation.finish(); }
+  };
+
+  const runRecipeAction = async (action: () => void | Promise<void>) => {
+    if (needsRefresh || !canDiscard()) return;
+    const operation = beginOperation();
+    if (!operation) return;
+    try { await action(); }
+    catch (error) { if (operation.isCurrent()) setFormError(t('errorOccurred')); }
+    finally { operation.finish(); }
+  };
+
+
+  const retryRecipeRead = async () => {
+    if (!onRefresh) return;
+    const operation = beginOperation();
+    if (!operation) return;
+    setFormError('');
+    try {
+      await onRefresh();
+      if (operation.isCurrent()) setYieldRefreshRequired(false);
+    } catch (error) {
+      if (operation.isCurrent()) setYieldRefreshRequired(true);
+    } finally { operation.finish(); }
+  };
 
   const selectedWorkspaceIngredient = useMemo(
     () => workspaceIngredients.find((workspaceIngredient) =>
@@ -137,34 +215,56 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   );
 
   const summaryIngredients = isEdit ? existingIngredients : draftIngredients;
-  const canAddIngredient = Boolean(ingredientId && quantity.trim() && unit && !isSaving);
+  const canAddIngredient = Boolean(ingredientId && quantity.trim() && unit && !isSaving && !needsRefresh);
   const canSaveCreate = Boolean(recipeName.trim() && draftIngredients.length > 0 && !isSaving);
 
   useEffect(() => {
-    if (!show) {
-      setRecipeName('');
+    const identity = `${mode}:${recipe?.id ?? 'new'}`;
+    if (!show || openRecipe.current !== identity) {
+      operationVersion.current++;
+      busy.current = false;
+      setIsSaving(false);
+      setYieldRefreshRequired(false);
+      const initialYield = isEdit && recipe?.planned_yield_g != null ? String(recipe.planned_yield_g) : '';
+      const initialName = isEdit ? recipe?.name || '' : '';
+      setRecipeName(initialName);
+      setPlannedYield(initialYield);
       setDraftIngredients([]);
       setIngredientId('');
       setQuantity('');
       setUnit(null);
+      entryIngredient.current = '';
       setFormError('');
       setIngredientError('');
-      setIsSaving(false);
-      return;
+      baseline.current = show ? recipeEditorSnapshot({
+        mode, name: initialName, plannedYield: initialYield, ingredients: [],
+        entry: { ingredientId: '', quantity: '', unit: '' },
+      }) : null;
+      openRecipe.current = show ? identity : null;
     }
-
-    if (isEdit) {
-      setRecipeName(recipe?.name || '');
-    }
-  }, [isEdit, recipe?.name, show]);
+  }, [isEdit, mode, recipe?.id, recipe?.name, recipe?.planned_yield_g, show]);
 
   useEffect(() => {
+    if (previousWorkspace.current === selectedWorkspaceId) return;
+    previousWorkspace.current = selectedWorkspaceId;
+    operationVersion.current++;
+    busy.current = false;
+    setIsSaving(false);
+    onHide();
+  }, [selectedWorkspaceId, onHide]);
+
+  useEffect(() => () => { operationVersion.current++; }, []);
+
+  useEffect(() => {
+    // A reference-data refresh must not overwrite a unit the user already chose.
+    if (entryIngredient.current === ingredientId) return;
+    entryIngredient.current = ingredientId;
     const defaultOption = resolvedUnits.defaultUnit
       ? unitOptions.find((option) => option.value === resolvedUnits.defaultUnit)
       : null;
-    setUnit(defaultOption || unitOptions[0] || null);
+    setUnit(ingredientId ? defaultOption || unitOptions[0] || null : null);
     setIngredientError('');
-  }, [resolvedUnits.defaultUnit, unitOptions]);
+  }, [ingredientId, resolvedUnits.defaultUnit, unitOptions]);
 
   const resetIngredientEntry = () => {
     setIngredientId('');
@@ -185,6 +285,7 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   );
 
   const addIngredient = async () => {
+    if (busy.current || needsRefresh) return;
     setIngredientError('');
     setFormError('');
 
@@ -227,22 +328,26 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
       return;
     }
 
+    const operation = beginOperation();
+    if (!operation) return;
     try {
-      setIsSaving(true);
       await onAddIngredientToRecipe({
         ingredient_id: selectedWorkspaceIngredient.ingredient_id,
         quantity: quantity.trim(),
         unit: unit.value,
       });
+      if (!operation.isCurrent()) return;
       resetIngredientEntry();
+      baseline.current = acknowledgeRecipeEditorSave(baseline.current, { entry: { ingredientId: '', quantity: '', unit: '' } });
     } catch (error) {
-      setFormError(t('failedToAddIngredient'));
+      if (operation.isCurrent()) setFormError(t('failedToAddIngredient'));
     } finally {
-      setIsSaving(false);
+      operation.finish();
     }
   };
 
   const removeIngredient = async (ingredientIdToRemove: number) => {
+    if (busy.current || needsRefresh) return;
     setFormError('');
 
     if (!isEdit) {
@@ -256,28 +361,35 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
       return;
     }
 
+    const operation = beginOperation();
+    if (!operation) return;
     try {
-      setIsSaving(true);
       await onDeleteIngredientFromRecipe(ingredientIdToRemove);
     } catch (error) {
-      setFormError(t('errorOccurred'));
+      if (operation.isCurrent()) setFormError(t('errorOccurred'));
     } finally {
-      setIsSaving(false);
+      operation.finish();
     }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (busy.current) return;
     setFormError('');
     setIngredientError('');
 
     if (isEdit) {
-      onHide();
+      requestClose();
       return;
     }
 
     if (!recipeName.trim()) {
       setFormError(t('recipeNameRequired'));
+      return;
+    }
+
+    if (recipeEditorHasPendingIngredient(draftValues.entry)) {
+      setFormError(t('uiRecipePendingIngredient'));
       return;
     }
 
@@ -290,17 +402,19 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
       return;
     }
 
-    setIsSaving(true);
+    const operation = beginOperation();
+    if (!operation) return;
     try {
       const yieldValue = plannedYield.trim() ? decimalInput(plannedYield) : null;
       if (plannedYield.trim() && (yieldValue == null || yieldValue <= 0)) { setFormError(t('costingYieldPositive')); return; }
       await onCreateRecipe(recipeName.trim(), draftIngredients, yieldValue);
     } catch (error) {
+      if (!operation.isCurrent()) return;
       setFormError(error instanceof Error && error.message === 'Failed to add ingredient'
         ? t('failedToAddIngredient')
         : t('failedToCreateRecipe'));
     } finally {
-      setIsSaving(false);
+      operation.finish();
     }
   };
 
@@ -340,11 +454,11 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   );
 
   return (
-    <Modal show={show} onHide={onHide} size="lg" className="recipe-builder-modal" centered>
+    <Modal show={show} onHide={requestClose} backdrop={isSaving ? "static" : true} keyboard={!isSaving} size="lg" className="recipe-builder-modal ui-workflow-modal" aria-labelledby={titleId} centered>
       <Form onSubmit={handleSubmit}>
-        <Modal.Header closeButton>
+        <Modal.Header closeButton={!isSaving} closeLabel={t('close')}>
           <div>
-            <Modal.Title>{isEdit ? t('editRecipe') : t('addRecipe')}</Modal.Title>
+            <Modal.Title id={titleId}>{isEdit ? t('editRecipe') : t('addRecipe')}</Modal.Title>
             <div className="recipe-builder-subtitle">
               {isEdit ? recipe?.name || t('recipe') : t('recipeBuilderSubtitle')}
             </div>
@@ -352,17 +466,24 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
         </Modal.Header>
 
         <Modal.Body>
+          {needsRefresh && (
+            <div className="alert alert-warning" role="alert">
+              <p>{t('uiRecipeSavedReadFailed')}</p>
+              {onRefresh && <Button variant="outline-secondary" type="button" onClick={() => void retryRecipeRead()} disabled={isSaving}>{t('tryAgain')}</Button>}
+            </div>
+          )}
+          <fieldset disabled={isSaving} aria-busy={isSaving}>
           <section className="recipe-builder-section mb-3">
-            <Form.Group controlId="plannedFinishedYield"><Form.Label>{t('costingYieldLabel')}</Form.Label>
+            <Form.Group controlId={`${titleId}-planned-yield`}><Form.Label>{t('costingYieldLabel')}</Form.Label>
               <Form.Control inputMode="decimal" value={plannedYield} onChange={event => setPlannedYield(event.target.value)} placeholder={t('costingUnknown')} />
               <Form.Text>{t('costingYieldHelp')}</Form.Text>
             </Form.Group>
-            {isEdit && <Button type="button" size="sm" className="mt-2" disabled={isSaving} onClick={saveYield}>{t('costingSaveYield')}</Button>}
+            {isEdit && <Button type="button" size="sm" className="mt-2" disabled={isSaving || needsRefresh} onClick={saveYield}>{t('costingSaveYield')}</Button>}
           </section>
           <div className="recipe-builder-layout">
             <div className="recipe-builder-main">
               <section className="recipe-builder-section">
-                <Form.Group>
+                <Form.Group controlId={`${titleId}-recipe-name`}>
                   <Form.Label>{t('recipeName')}</Form.Label>
                   <Form.Control
                     type="text"
@@ -388,6 +509,8 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
 
                 <div className="recipe-builder-entry-grid">
                   <SelectDropdown
+                    isDisabled={isSaving}
+                    inputId={`${titleId}-ingredient`}
                     value={selectedIngredientOption}
                     onChange={(selectedOption: any) => setIngredientId(selectedOption ? selectedOption.value : '')}
                     options={ingredientOptions}
@@ -396,7 +519,7 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     label={t('ingredient')}
                     error={ingredientError === t('ingredientRequired') ? ingredientError : undefined}
                   />
-                  <Form.Group>
+                  <Form.Group controlId={`${titleId}-ingredient-quantity`}>
                     <Form.Label>{t('quantity')}</Form.Label>
                     <Form.Control
                       type="text"
@@ -416,6 +539,8 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     />
                   </Form.Group>
                   <SelectDropdown
+                    isDisabled={isSaving}
+                    inputId={`${titleId}-ingredient-unit`}
                     value={unit}
                     onChange={(selectedOption) => {
                       setUnit(selectedOption || null);
@@ -480,7 +605,7 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                         onClick={() => removeIngredient(getRemoveId(ingredient))}
                         aria-label={t('removeIngredientFromRecipe')}
                         className="recipe-builder-remove-button"
-                        disabled={isSaving}
+                        disabled={isSaving || needsRefresh}
                       >
                         <FaTrash />
                       </Button>
@@ -503,6 +628,7 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               {formError}
             </div>
           )}
+          </fieldset>
         </Modal.Body>
 
         <Modal.Footer>
@@ -513,26 +639,26 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
           </div>
           <div className="recipe-builder-footer-actions">
             {isEdit && onDeleteRecipe && (
-              <Button variant="outline-danger" type="button" onClick={onDeleteRecipe} disabled={isSaving}>
+              <Button variant="outline-danger" type="button" onClick={() => void runRecipeAction(onDeleteRecipe)} disabled={isSaving || needsRefresh}>
                 <FaTrash className="me-2" />
                 {t('delete')}
               </Button>
             )}
             {isEdit && onCloneRecipe && (
-              <Button variant="outline-secondary" type="button" onClick={onCloneRecipe} disabled={isSaving}>
+              <Button variant="outline-secondary" type="button" onClick={() => void runRecipeAction(onCloneRecipe)} disabled={isSaving || needsRefresh}>
                 {t('cloneRecipe')}
               </Button>
             )}
-            <Button variant="outline-secondary" type="button" onClick={onHide} disabled={isSaving}>
+            <Button variant="outline-secondary" type="button" onClick={requestClose} disabled={isSaving}>
               {t('cancel')}
             </Button>
             <Button
               variant="primary"
               type={isEdit ? 'button' : 'submit'}
-              onClick={isEdit ? onHide : undefined}
+              onClick={isEdit ? requestClose : undefined}
               disabled={isEdit ? isSaving : !canSaveCreate}
             >
-              {isSaving ? t('loading') : t('save')}
+              {isSaving ? t('loading') : t(isEdit ? 'done' : 'save')}
             </Button>
           </div>
         </Modal.Footer>

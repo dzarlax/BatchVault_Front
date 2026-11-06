@@ -6,6 +6,7 @@ import useTranslation from 'next-translate/useTranslation';
 import { Form, Button, Table } from 'react-bootstrap';
 import TableSkeleton from '../components/skeletons/TableSkeleton';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import IngredientTypeBadge from '../components/IngredientTypeBadge';
 import { useRouter } from 'next/router';
 import { FaPlus, FaDollarSign, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
@@ -43,7 +44,7 @@ const Prices = () => {
   const { t, lang } = useTranslation('common');
   const { auth } = useAuth();
   const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
-  const { data: workspaceIngredients, error: ingredientsError } = useSWR<WorkspaceIngredient[]>(
+  const { data: workspaceIngredients, error: ingredientsError, mutate: mutateIngredients } = useSWR<WorkspaceIngredient[]>(
     workspaceKey('/api/workspace-ingredients', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
@@ -156,6 +157,10 @@ const Prices = () => {
   const clearFilters = () => {
     setFilterIngredientId('');
     setFilterDate('');
+    if (router.query.ingredient_id) {
+      const { ingredient_id: _ingredient, ...query } = router.query;
+      void router.replace({ pathname: router.pathname, query }, undefined, { shallow: true });
+    }
   };
 
   const sortPrices = (column: string) => {
@@ -170,7 +175,7 @@ const Prices = () => {
   const hasActiveFilters = filterIngredientId || filterDate;
 
   const hasError = ingredientsError || pricesError;
-  const isLoading = !isWorkspaceReady || !workspaceIngredients || !prices;
+  const isLoading = !isWorkspaceReady || (!prices && !pricesError);
 
   const filteredPrices = useMemo(() => {
     const rows = [...(prices || [])].filter((price) => {
@@ -236,6 +241,7 @@ const Prices = () => {
         <Button
           className="btn btn-primary"
           onClick={() => setShowAddModal(true)}
+          disabled={!workspaceIngredients || Boolean(ingredientsError)}
         >
           <FaPlus className="me-2" />
           {t('addPrice')}
@@ -243,7 +249,7 @@ const Prices = () => {
       </div>
 
       {/* Filter Section */}
-      <FilterBar>
+      <FilterBar mobileCollapsible activeCount={[filterIngredientId, filterDate].filter(Boolean).length} summary={[ingredientOptions.find(option => String(option.value) === String(filterIngredientId))?.label, filterDate].filter(Boolean).join(' · ')} onClear={clearFilters}>
         <div className="filter-group">
           <SelectDropdown
             value={ingredientOptions.find(option => String(option.value) === filterIngredientId) || null}
@@ -296,22 +302,18 @@ const Prices = () => {
         </Button>
       </div>
 
+      {hasError && <ErrorState message={t(ingredientsError ? 'ingredientsError' : 'pricesError')} compact={Boolean(prices)} onRetry={() => { void Promise.allSettled([mutatePrices(), mutateIngredients()]); }} />}
+
       {/* Prices Table */}
       <div className="table-responsive prices-table-wrap">
-        {hasError ? (
-          <div className="text-center py-5">
-            <p className="text-error">
-              {ingredientsError ? t('ingredientsError') : t('pricesError')}
-            </p>
-          </div>
-        ) : isLoading ? (
+        {!prices && hasError ? null : isLoading ? (
           <TableSkeleton rows={10} columns={6} />
         ) : filteredPrices.length === 0 ? (
           <EmptyState
             type="prices"
             message={hasActiveFilters ? t('noPricesFound') : t('noPrices')}
-            actionLabel={t('addPrice')}
-            onAction={() => setShowAddModal(true)}
+            actionLabel={hasActiveFilters ? t('clear') : workspaceIngredients && !ingredientsError ? t('addPrice') : undefined}
+            onAction={hasActiveFilters ? clearFilters : () => setShowAddModal(true)}
           />
         ) : (
           <Table className="table prices-table">

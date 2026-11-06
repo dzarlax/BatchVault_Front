@@ -129,7 +129,7 @@ for (const locale of ['en', 'ru', 'rs']) test(`editor has a localized name, name
 test('mobile filters preserve selection, show active count while collapsed and reset completely', { skip: !enabled }, async () => {
   const qa = await setup({ viewport: { width: 390, height: 844 } });
   try {
-    const toggle = qa.page.locator('button[aria-controls="product-filters"]');
+    const toggle = qa.page.locator('.filter-disclosure-toggle');
     await qa.expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await qa.expect(qa.page.locator('#product-type-filter')).not.toBeVisible();
     const grid = await qa.page.locator('.products-grid').boundingBox();

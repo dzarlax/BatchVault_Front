@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button, Form, InputGroup } from 'react-bootstrap';
 import { IconType } from 'react-icons';
-import { FaSearch, FaTimes } from 'react-icons/fa';
+import { FaSearch, FaTimes, FaChevronDown } from 'react-icons/fa';
+import useTranslation from 'next-translate/useTranslation';
 
 type FilterBarProps = {
   children: React.ReactNode;
   className?: string;
+  mobileCollapsible?: boolean;
+  activeCount?: number;
+  summary?: string;
+  onClear?: () => void;
 };
 
 type FilterFieldProps = {
@@ -48,11 +53,78 @@ type ClearFiltersButtonProps = {
   className?: string;
 };
 
-export const FilterBar: React.FC<FilterBarProps> = ({ children, className = '' }) => (
-  <div className={`filter-bar unified-filter-bar ${className}`.trim()}>
-    {children}
-  </div>
-);
+export const FilterBar: React.FC<FilterBarProps> = ({
+  children,
+  className = '',
+  mobileCollapsible = false,
+  activeCount = 0,
+  summary,
+  onClear,
+}) => {
+  const { t } = useTranslation('common');
+  const generatedId = useId();
+  const controlsId = `filter-controls-${generatedId}`;
+  const [expanded, setExpanded] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 991.98px)');
+    const update = () => {
+      setIsMobile(media.matches);
+      if (!initialized.current) {
+        initialized.current = true;
+        if (media.matches && mobileCollapsible) setExpanded(false);
+      }
+    };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, [mobileCollapsible]);
+
+  const collapsible = mobileCollapsible && isMobile;
+  const isExpanded = !collapsible || expanded;
+
+  return (
+    <section className={`filter-bar unified-filter-bar ${mobileCollapsible ? 'filter-disclosure' : ''} ${className}`.trim()}>
+      {mobileCollapsible && (
+        <div className="filter-disclosure-header">
+          {collapsible ? <Button
+            type="button"
+            variant="link"
+            className="filter-disclosure-toggle"
+            aria-expanded={isExpanded}
+            aria-controls={controlsId}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            <span>{t('filters')}</span>
+            <FaChevronDown aria-hidden="true" className={isExpanded ? 'filter-chevron is-open' : 'filter-chevron'} />
+            {activeCount > 0 && (
+              <span className="filter-active-count" aria-label={t('uiActiveFilterCount', { count: activeCount })}>
+                {activeCount}
+              </span>
+            )}
+            {summary && <span className="filter-disclosure-summary">{summary}</span>}
+          </Button> : <div className="filter-disclosure-label">
+            <span>{t('filters')}</span>
+            {activeCount > 0 && <span className="filter-active-count" aria-label={t('uiActiveFilterCount', { count: activeCount })}>{activeCount}</span>}
+            {summary && <span className="filter-disclosure-summary">{summary}</span>}
+          </div>}
+          {onClear && activeCount > 0 && (
+            <Button type="button" variant="link" className="filter-disclosure-clear" onClick={onClear}>
+              <FaTimes aria-hidden="true" /> {t('clear')}
+            </Button>
+          )}
+        </div>
+      )}
+      {mobileCollapsible ? (
+        <div id={controlsId} className="filter-disclosure-content" hidden={!isExpanded}>
+          {children}
+        </div>
+      ) : children}
+    </section>
+  );
+};
 
 export const FilterField: React.FC<FilterFieldProps> = ({
   label,
