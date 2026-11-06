@@ -64,7 +64,7 @@ export default function ProductCostingEditor({ draft, onChange, recipes, selecte
               placeholder={t('costingChooseRecipe')} value={recipeOptions.find(option => option.value === row.recipe_id) ?? null}
               onChange={option => update({ components: draft.components.map((item, i) => i === index ? { ...item, recipe_id: option?.value ?? 0 } : item) })} {...dropdownMessages} />
           </Form.Group>
-          <Form.Group style={{ flex: '0 1 110px' }} controlId={`component-grams-${index}`}><Form.Label>{t('costingGrams')}</Form.Label><Form.Control inputMode="decimal" value={row.quantity_g} onChange={e => update({ components: draft.components.map((item, i) => i === index ? { ...item, quantity_g: e.target.value } : item) })} /></Form.Group>
+          <Form.Group style={{ flex: '0 1 110px' }} controlId={`component-grams-${index}`}><Form.Label>{t('costingGrams')}</Form.Label><Form.Control aria-label={t('productComponentGrams', { number: index + 1, product: recipes.find(recipe => recipe.id === row.recipe_id)?.name || t('costingFlavour', { number: index + 1 }) })} inputMode="decimal" value={row.quantity_g} onChange={e => update({ components: draft.components.map((item, i) => i === index ? { ...item, quantity_g: e.target.value } : item) })} /></Form.Group>
           <Button variant="outline-danger" aria-label={t('costingRemoveFlavour', { number: index + 1 })} onClick={() => update({ components: draft.components.filter((_, i) => i !== index) })}>{t('costingRemove')}</Button>
         </div>)}
         <Button size="sm" variant="outline-primary" onClick={() => update({ components: [...draft.components, { recipe_id: 0, quantity_g: '' }] })}>{t('costingAddFlavour')}</Button>

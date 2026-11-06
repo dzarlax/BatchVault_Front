@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Form } from 'react-bootstrap';
 import useTranslation from 'next-translate/useTranslation';
 import type { CostEstimate, Product, ProductPackage, Recipe } from '../../types/api';
+import type { ProductEditorErrors } from '../../utils/productEditorState';
 import type { CostingDraft } from '../../utils/costing';
 import { conversionContextKey, productConfigurationPayload } from '../../utils/productTypes';
 import fetcher from '../../utils/fetcher';
@@ -9,12 +10,14 @@ import SelectDropdown from '../SelectDropdown';
 import CostBreakdown from './CostBreakdown';
 import AssortmentCompositionEditor from './AssortmentCompositionEditor';
 
-export default function ProductCostingEditor({ draft, onChange, recipes, products, productId, selectedPackage, packageId, workspaceId, currency, show, packageControls, cost, setCost, originalCost }: {
+export default function ProductCostingEditor({ draft, onChange, recipes, products, productId, selectedPackage, packageId, workspaceId, currency, show, packageControls, cost, setCost, originalCost, validationErrors = {}, onConversionChoice }: {
+  validationErrors?: ProductEditorErrors; onConversionChoice?: (choice: boolean) => void;
   draft: CostingDraft; onChange: (draft: CostingDraft) => void; recipes: Recipe[]; products: Product[]; productId?: number;
   selectedPackage?: ProductPackage; packageId: number | null; workspaceId: string | null; currency: string; show: boolean;
   packageControls: React.ReactNode; cost: string; setCost: (value: string) => void; originalCost?: number | null;
 }) {
   const { t } = useTranslation('common');
+  const issue = (id: string) => validationErrors[id] ? t(validationErrors[id].key, validationErrors[id].values) : undefined;
   const [result, setResult] = useState<{ context: string; estimate: CostEstimate } | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -51,9 +54,9 @@ export default function ProductCostingEditor({ draft, onChange, recipes, product
   const recipeOptions = recipes.map(recipe => ({ value: recipe.id, label: recipe.name }));
   const selectedRecipe = recipes.find(recipe => recipe.id === draft.cost_recipe_id);
   return <>
-    {draft.product_type === 'assortment' ? <AssortmentCompositionEditor draft={draft} onChange={onChange} products={products} recipes={recipes} productId={productId} estimate={estimate} currency={currency} packageWeight={packageWeight} />
+    {draft.product_type === 'assortment' ? <AssortmentCompositionEditor validationErrors={validationErrors} draft={draft} onChange={onChange} products={products} recipes={recipes} productId={productId} estimate={estimate} currency={currency} packageWeight={packageWeight} />
       : <section className="product-configuration-section"><h5>{t('recipe')}</h5>
-        <SelectDropdown inputId="costRecipe" label={t('productPrimaryRecipe')} options={recipeOptions}
+        <SelectDropdown inputId="costRecipe" error={issue('costRecipe')} label={t('productPrimaryRecipe')} options={recipeOptions}
           value={recipeOptions.find(option => option.value === draft.cost_recipe_id) ?? null}
           onChange={option => onChange({ ...draft, cost_recipe_id: option?.value ?? null })} isSearchable isClearable
           loadingMessage={t('costingSelectLoading')} noOptionsMessage={t('costingSelectEmpty')} placeholder={t('costingChooseRecipe')} />
@@ -63,22 +66,24 @@ export default function ProductCostingEditor({ draft, onChange, recipes, product
       <p className="small text-secondary mb-0">{draft.product_type === 'assortment' ? t('productCommonPackageHelp') : t('costingPackageHelp')}
         {packageCost != null && <> · {t('costingOnePackage')}: {packageCost.toFixed(2)} {currency}</>}</p>
     </section>
-    <section className="product-configuration-section" aria-label={t('costingTitle')}><h5>{t('costingTitle')}</h5>
+    <section className="product-configuration-section" id="product-configuration" tabIndex={-1} aria-invalid={Boolean(issue('product-configuration'))} aria-describedby={issue('product-configuration') ? 'product-configuration-error' : undefined} aria-label={t('costingTitle')}><h5>{t('costingTitle')}</h5>{issue('product-configuration') && <p id="product-configuration-error" className="text-danger">{issue('product-configuration')}</p>}
       <div className="product-choice-group mb-3" role="group" aria-label={t('productCostMethod')}>
         {['automatic', 'manual'].map(method => <Form.Check key={method} type="radio" name="costMethod" id={`cost-method-${method}`} label={t(method === 'manual' ? 'productCostManual' : 'productCostAutomatic')}
           checked={(draft.cost_mode === 'manual') === (method === 'manual')} onChange={() => onChange({ ...draft, cost_mode: method === 'manual' ? 'manual' : draft.product_type === 'assortment' ? 'assortment' : 'recipe', conversionAccepted: false })} />)}
       </div>
       {draft.cost_mode === 'manual' ? <Form.Group controlId="cost"><Form.Label>{t('productFullUnitCost')}</Form.Label>
-        <div className="input-group"><span className="input-group-text">{currency}</span><Form.Control inputMode="decimal" value={cost} onChange={event => setCost(event.target.value)} /></div>
+        <div className="input-group"><span className="input-group-text">{currency}</span><Form.Control inputMode="decimal" value={cost} isInvalid={Boolean(issue('cost'))} aria-invalid={Boolean(issue('cost'))} aria-describedby={issue('cost') ? 'cost-error' : undefined} onChange={event => setCost(event.target.value)} /></div>
+        {issue('cost') && <div id="cost-error" className="invalid-feedback d-block">{issue('cost')}</div>}
         <Form.Text>{t('productManualIncludesPackage')}</Form.Text>
       </Form.Group> : <>
         {loading && <p role="status">{t('costingCalculating')}</p>}
         {failed && <Alert variant="warning">{t('costingPreviewFailed')}</Alert>}
-        {estimate && <><CostBreakdown estimate={estimate} currency={currency} />{estimate.status === 'incomplete' && <p className="small text-warning">{t('productIncompleteSaveHelp')}</p>}</>}
+        {estimate && <><CostBreakdown estimate={estimate} currency={currency} presentation="editor" />{estimate.status === 'incomplete' && <p className="small text-warning">{t('productIncompleteSaveHelp')}</p>}</>}
       </>}
       {draft.converting && <p className="small text-secondary mt-3">{t('productConversionOldCost')}: {originalCost != null ? `${originalCost.toFixed(2)} ${currency}` : t('costingUnavailable')} · {t('productConversionNewCost')}: {draft.cost_mode === 'manual' ? `${cost || '—'} ${currency}` : estimate?.total_cost != null ? `${estimate.total_cost.toFixed(2)} ${currency}` : t('costingUnavailable')}</p>}
-      {draft.converting && <Form.Check className="mt-3" id="accept-conversion" checked={accepted} disabled={draft.cost_mode !== 'manual' && (!estimate || estimate.status !== 'complete' || loading)}
-        onChange={event => onChange({ ...draft, conversionAccepted: event.target.checked, conversionAcceptedContext: contextKey, conversionAcceptedEstimate: estimateKey })} label={t('productAcceptConversion')} />}
+      {draft.converting && <Form.Check className="mt-3" id="accept-conversion" aria-invalid={Boolean(issue('accept-conversion'))} aria-describedby={issue('accept-conversion') ? 'accept-conversion-error' : undefined} checked={accepted} disabled={draft.cost_mode !== 'manual' && (!estimate || estimate.status !== 'complete' || loading)}
+        onChange={event => { onConversionChoice?.(event.target.checked); onChange({ ...draft, conversionAccepted: event.target.checked, conversionAcceptedContext: contextKey, conversionAcceptedEstimate: estimateKey }); }} label={t('productAcceptConversion')} />}
+      {issue('accept-conversion') && <p id="accept-conversion-error" className="text-danger">{issue('accept-conversion')}</p>}
     </section>
   </>;
 }

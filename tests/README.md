@@ -30,3 +30,9 @@ The browser runner executes the editor and order suites in separate API request 
 The editor suite covers nested packaging cost changes and initial net weight assignment without changing the selected package ID, plus Russian desktop and Serbian mobile costing controls, shared dropdown interactions, translated issue/validation messages and recipe yield labels. `COSTING_QA_SCREENSHOTS` optionally selects an output directory for synthetic-data screenshots.
 
 For independently owned fixture records, set `COSTING_QA_EDITOR_USER_PREFIX` and seed four accounts ending in `cost`, `weight`, `ru`, and `rs`. Each needs the same synthetic product/recipe/package fixture contract and password as above. Without the prefix, the editor cases use `costing-qa` and restore the original product package after each packaging scenario. Fixture credentials are for disposable localhost data only.
+
+## UI review regressions
+
+`npm run test:ui` exercises the product catalog and editor against intercepted synthetic API responses. Set `COSTING_QA_WEB_URL` to the running localhost frontend, plus the same optional `PLAYWRIGHT_MODULE` and `COSTING_QA_CHROME` used above. No live backend is used by this suite. `COSTING_QA_SCREENSHOTS` selects a directory outside the repository for viewport evidence.
+
+The suite covers short-window navigation, dirty-close confirmation, visible validation and focus, dialog and component names, workspace currency, collapsed mobile filters, incomplete status, and independently expanding cards. The shared fixture is in `tests/helpers/product-ui.cjs`; existing product-type browser cases use the same fixture. These UI checks do not establish backend persistence or replace the real-backend integration cases.

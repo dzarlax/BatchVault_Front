@@ -81,13 +81,15 @@ const SelectDropdown = forwardRef<any, SelectDropdownProps>(
           styles={styles}
           {...props}
           inputId={controlInputId}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={error ? `${controlInputId}-error` : props['aria-describedby']}
           components={{ Input: StableInput, ...props.components }}
         />
         {helperText && !error && (
           <small className="form-text text-tertiary">{helperText}</small>
         )}
         {error && (
-          <small className="form-text text-error">{error}</small>
+          <small id={`${controlInputId}-error`} className="form-text text-error">{error}</small>
         )}
       </div>
     );
