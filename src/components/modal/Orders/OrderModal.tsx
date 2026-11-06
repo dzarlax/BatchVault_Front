@@ -1,6 +1,7 @@
 import React from 'react';
-import { OrderItem } from '../../../types/api';
-import { calculatedSnapshot, costSourceLabel } from '../../../utils/costing';
+import ProductComposition from '../../products/ProductComposition';
+import { OrderItem, Product } from '../../../types/api';
+import { calculatedSnapshot, costSourceLabel, supportedCostSnapshot } from '../../../utils/costing';
 import { Modal, Form, Button, FormControl } from 'react-bootstrap';
 import { FaTimes } from 'react-icons/fa';
 import useTranslation from 'next-translate/useTranslation';
@@ -21,6 +22,7 @@ interface Client {
 }
 
 interface OrderModalProps {
+  products?: Product[];
   show: boolean;
   onClose: () => void;
   onSave: () => void | Promise<void>;
@@ -48,6 +50,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
   onSave,
   clientOptions,
   productOptions,
+  products = [],
   statusOptions,
   clientId,
   status,
@@ -202,12 +205,14 @@ const OrderModal: React.FC<OrderModalProps> = ({
                           type="number"
                           min="0"
                           step="0.01"
-                          readOnly={calculatedSnapshot(item.cost_snapshot) || item.cost_source === 'recipe' || item.cost_source === 'assortment'}
+                          readOnly={!supportedCostSnapshot(item.cost_snapshot) || calculatedSnapshot(item.cost_snapshot) || item.cost_source === 'recipe' || item.cost_source === 'assortment'}
                           value={Number.isFinite(item.cost_price) ? item.cost_price : ''}
                           onChange={event => handleItemChange(index, 'cost_price', event.target.value.trim() ? Number(event.target.value) : Number.NaN)}
                         />
                       </Form.Group>
                     </div>
+                    {!supportedCostSnapshot(item.cost_snapshot) && <p className="small text-warning">{t('productSnapshotReadOnly')}</p>}
+                    <ProductComposition product={products.find(product => product.id === item.product_id)} snapshot={item.cost_snapshot} historical={Boolean(item.cost_snapshot || (item.id && !item.cost_source))} />
                     <p className="small text-secondary mb-1">{item.id && !item.cost_source ? t('costingSavedOrderCost') : t('costingCurrentEstimate')} · {costSourceLabel(item.cost_snapshot?.source || item.cost_source, t)}</p>
                     {!item.cost_snapshot && (item.cost_source === 'recipe' || item.cost_source === 'assortment') && <Button size="sm" variant="outline-secondary" onClick={() => void runOperation(() => handleRefreshItemCost(index))}>{t('costingRefreshEstimate')}</Button>}
                   </div>
@@ -256,7 +261,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
         <Button
           variant="primary"
           onClick={() => void runOperation(onSave)}
-          disabled={isBusy || items.length === 0 || !clientId || items.some(item => !item.product_id || !Number.isFinite(item.cost_price) || item.cost_price < 0)}
+          disabled={isBusy || items.length === 0 || !clientId || items.some(item => !supportedCostSnapshot(item.cost_snapshot) || !item.product_id || !Number.isFinite(item.cost_price) || item.cost_price < 0)}
         >
           {t('saveChanges')}
         </Button>

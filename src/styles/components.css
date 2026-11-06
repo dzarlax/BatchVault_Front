@@ -2076,3 +2076,19 @@ div.products-sections > div.recipe-section > div.products-grid > div.product-gri
 [data-theme="dark"] .form-section .text-muted {
   color: var(--text-tertiary) !important;
 }
+
+/* Product composition and costing share one form surface. */
+.product-type-modal .modal-body { padding: 1.5rem; }
+.product-configuration-section { padding: 1.25rem 0; border-bottom: 1px solid var(--border-primary); }
+.product-configuration-section:first-child { padding-top: 0; }
+.product-configuration-section:last-child { border-bottom: 0; }
+.product-choice-group { display: flex; flex-wrap: wrap; gap: 12px; }
+.product-choice-group .form-check { flex: 1 1 180px; padding: 12px 16px 12px 42px; border: 1px solid var(--border-primary); border-radius: 8px; }
+.product-choice-group .form-check:has(input:checked) { border-color: var(--brand-500); background: rgba(139,38,53,.06); }
+.product-choice-group .form-check-input { margin-left: -26px; }
+.assortment-component-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-primary); }
+.assortment-component-row:last-of-type { margin-bottom: 12px; }
+.assortment-component-product { flex: 1 1 250px; min-width: 0; }
+.assortment-component-weight { flex: 0 1 90px; }
+.assortment-component-cost { flex: 0 0 100px; text-align: right; padding-bottom: 8px; }
+@media(max-width:575px) { .product-type-modal .modal-body { padding: 1rem; } .assortment-component-product { flex-basis: 100%; } .assortment-component-weight { flex: 1; } }

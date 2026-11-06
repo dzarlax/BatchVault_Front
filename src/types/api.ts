@@ -63,19 +63,37 @@ export interface ProductOption {
   recipe?: Recipe;
 }
 
+export type ProductType = 'standard' | 'assortment';
+export type CompositionBasis = 'products' | 'legacy_recipes';
+export interface AssortmentComponent { component_product_id: number; quantity_g: number; position: number; }
+export interface CompositionDetail {
+  component_product_id?: number | null; product_name: string; recipe_id?: number | null; recipe_name?: string | null;
+  quantity_g: number; position: number; status: string; cost_per_gram: number | null; content_cost: number | null; issues?: CostIssue[];
+}
+export interface CostProvenance {
+  product_type: string; product_name: string; composition_basis?: string | null; components: CompositionDetail[];
+  package?: ProductPackage | null;
+}
 export type CostMode = 'manual' | 'recipe' | 'assortment';
-export interface CostIssue { code: string; message: string; recipe_id?: number; ingredient_id?: number; }
+export interface CostIssue { code: string; message: string; recipe_id?: number; ingredient_id?: number; component_product_id?: number; }
 export interface CostEstimate {
+  composition_details?: CompositionDetail[];
   status: 'complete' | 'incomplete'; source: CostMode; total_cost: number | null;
   content_cost: number | null; packaging_cost: number | null; known_ingredient_cost: number;
   cost_per_gram: number | null; planned_yield_g?: number | null; net_weight_g?: number | null;
   components: { recipe_id: number; name: string; quantity_g: number; planned_yield_g: number | null; recipe_cost: number | null; cost_per_gram?: number | null; content_cost: number | null }[];
   issues: CostIssue[]; calculated_at: string;
 }
-export interface CostSnapshot { version: number; source: CostMode; amount: number; estimate?: CostEstimate; calculated_at: string; }
+export interface CostSnapshot { provenance?: CostProvenance | null; version: number; source: CostMode; amount: number; estimate?: CostEstimate; calculated_at: string; }
 export interface ProductCostComponent { recipe_id: number; quantity_g: number; }
 
 export interface Product {
+  product_type?: string;
+  composition_basis?: string | null;
+  configuration_version?: number;
+  recipe_id?: number | null;
+  assortment_components?: AssortmentComponent[];
+  refresh_required?: boolean;
   cost_mode?: CostMode;
   cost_recipe_id?: number | null;
   components?: ProductCostComponent[];
@@ -107,6 +125,7 @@ export interface Ingredient {
 }
 
 export interface Workspace {
+  capabilities?: { product_types_v1?: boolean };
   id: number;
   name: string;
   slug: string;

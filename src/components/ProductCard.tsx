@@ -1,4 +1,5 @@
 import React from 'react';
+import ProductComposition from './products/ProductComposition';
 import CostBreakdown from './products/CostBreakdown';
 import { effectiveProductCost } from '../utils/costing';
 import useTranslation from 'next-translate/useTranslation';
@@ -26,7 +27,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   const costingRecipeIds = product.cost_mode === 'recipe' && product.cost_recipe_id ? [product.cost_recipe_id]
     : product.cost_mode === 'assortment' ? (product.components || []).map(row => row.recipe_id) : [];
-  const recipeNames = costingRecipeIds.length > 0 ? costingRecipeIds.map(id =>
+  const recipeNames = product.composition_basis === 'products' ? (product.cost_estimate?.composition_details || []).map(row => row.product_name) : costingRecipeIds.length > 0 ? costingRecipeIds.map(id =>
     product.cost_estimate?.components.find(row => row.recipe_id === id)?.name || recipes.find(recipe => recipe.id === id)?.name || t('costingRecipeReference', { id })
   ) : (product.options || []).map(option => option.recipe?.name?.trim() || recipes.find(recipe => recipe.id === option.recipe_id)?.name).filter((name): name is string => Boolean(name));
   const visibleRecipeNames = recipeNames.slice(0, 2).join(', ');
@@ -63,7 +64,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {product.description || t('noDescription')}
         </p>
 
-        <div className="product-card-recipes">
+        <ProductComposition product={product} />
+        <div className="product-card-recipes" hidden={product.composition_basis === 'products'}>
           <FaUtensils size={13} />
           <span>
             {recipeNames.length > 0 ? (

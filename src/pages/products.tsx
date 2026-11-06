@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ProductCostingEditor from '../components/products/ProductCostingEditor';
-import { CostingDraft, emptyCostingDraft, costingPayload, decimalInput, validCostingDraft } from '../utils/costing';
+import LegacyProductCostingEditor from '../components/products/LegacyProductCostingEditor';
+import { changeProductType, conversionContextKey, currentProductType, emptyProductDraft, productConfigurationPayload, productDraft, validProductDraft } from '../utils/productTypes';
+import { CostingDraft, emptyCostingDraft, costingPayload, decimalInput, validCostingDraft, effectiveProductCost } from '../utils/costing';
 import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
 import { useRouter } from 'next/router';
 import useTranslation from 'next-translate/useTranslation';
 import { useAuth, withAuth } from '../utils/authContext';
-import { Button } from 'react-bootstrap';
+import { Button, Form } from 'react-bootstrap';
 import { SingleValue } from 'react-select';
 import ProductModal from '../components/modal/Products/ProductModal';
 import PackageModal from '../components/modal/Products/PackageModal';
@@ -26,7 +28,7 @@ import { ClearFiltersButton, FilterBar } from '../components/filters/FilterBar';
 const Products = () => {
   const { t } = useTranslation('common');
   const { auth } = useAuth();
-  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady, selectedWorkspace } = useWorkspace();
   const { success, error: showError } = useNotification();
   const { data: products, mutate: mutateProducts, error: productsError } = useSWR<Product[]>(
     workspaceKey('/api/products', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
@@ -41,6 +43,16 @@ const Products = () => {
     workspaceFetcher
   );
   const router = useRouter();
+  const modern = selectedWorkspace?.capabilities?.product_types_v1 === true;
+  const [busy, setBusy] = useState(false);
+  const [productMessage, setProductMessage] = useState('');
+  const [reloadNeeded, setReloadNeeded] = useState(false);
+  const [savedProductId, setSavedProductId] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const operation = useRef<object | null>(null);
+  const scope = useRef({ id: selectedWorkspaceId, epoch: 0 });
+  if (scope.current.id !== selectedWorkspaceId) scope.current = { id: selectedWorkspaceId, epoch: scope.current.epoch + 1 };
+  const draftValid = (draft: CostingDraft, weight?: number | null) => modern ? validProductDraft(draft, weight, conversionContextKey(draft, packageId, packages?.find(pkg => pkg.id === packageId), cost, products || [], recipes || [], selectedWorkspaceId)) : validCostingDraft(draft, weight);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -59,6 +71,7 @@ const Products = () => {
   const [selectedProduct, setSelectedProduct] = useState<SingleValue<{ value: number; label: string }> | null>(null);
 
   useEffect(() => {
+    operation.current = null; setBusy(false); setProductMessage(''); setReloadNeeded(false); setSavedProductId(null); setTypeFilter(null);
     setShowProductModal(false); setShowPackageModal(false); setEditingProduct(null);
     setName(''); setDescription(''); setPrice(''); setCost(''); setImage(''); setPackageId(null);
     setRecipeIds([]); setSelectedRecipes([]); setCostingDraft(emptyCostingDraft());
@@ -67,9 +80,10 @@ const Products = () => {
 
   const filteredProducts = useMemo(() => {
     let filtered = products || [];
+    if (typeFilter) filtered = filtered.filter(product => currentProductType(product) === typeFilter);
     if (selectedRecipe) {
       filtered = filtered.filter(product =>
-        (product.options || []).some(option => option.recipe_id === selectedRecipe.value) || product.cost_recipe_id === selectedRecipe.value || (product.components || []).some(row => row.recipe_id === selectedRecipe.value)
+        (product.options || []).some(option => option.recipe_id === selectedRecipe.value) || product.cost_recipe_id === selectedRecipe.value || (product.components || []).some(row => row.recipe_id === selectedRecipe.value) || (product.assortment_components || []).some(row => { const source = products?.find(item => item.id === row.component_product_id); return source?.recipe_id === selectedRecipe.value || source?.cost_recipe_id === selectedRecipe.value; })
       );
     }
 
@@ -84,20 +98,21 @@ const Products = () => {
     }
 
     return filtered;
-  }, [products, selectedPackage, selectedProduct, selectedRecipe]);
+  }, [products, selectedPackage, selectedProduct, selectedRecipe, typeFilter]);
 
   const handleEditProduct = (product: Product) => {
-    if (!recipes || !packages) {
+    if (operation.current || !recipes || !packages) {
       console.warn('Recipes or packages data not loaded yet');
       return;
     }
 
+    setProductMessage(''); setReloadNeeded(false); setSavedProductId(null);
     setEditingProduct(product);
     setName(product.name);
     setDescription(product.description || '');
     setPrice(product.price.toString());
-    setCost(product.cost.toString());
-    setCostingDraft({ cost_mode: product.cost_mode || 'manual', cost_recipe_id: product.cost_recipe_id ?? null,
+    setCost(String(effectiveProductCost(product) ?? ''));
+    setCostingDraft(modern ? productDraft(product) : { cost_mode: product.cost_mode || 'manual', cost_recipe_id: product.cost_recipe_id ?? null,
       components: (product.components || []).map(row => ({ recipe_id: row.recipe_id, quantity_g: String(row.quantity_g) })),
       reviewed: product.cost_mode === 'recipe' || product.cost_mode === 'assortment' });
     setImage(product.image || product.image_url || '');
@@ -114,6 +129,8 @@ const Products = () => {
   };
 
   const handleCloseProductModal = () => {
+    if (operation.current) return;
+    setProductMessage(''); setReloadNeeded(false); setSavedProductId(null);
     setEditingProduct(null);
     setName('');
     setDescription('');
@@ -128,86 +145,74 @@ const Products = () => {
   };
 
   const handleSaveProductChanges = async () => {
+    if (operation.current || savedProductId || !selectedWorkspaceId) return;
+    const token = {};
+    operation.current = token; setBusy(true); setProductMessage('');
+    const epoch = scope.current.epoch;
+    const current = () => operation.current === token && scope.current.epoch === epoch;
     try {
-      if (!auth.token) {
-        router.push('/auth/signin');
-        return;
+      if (!auth.token) { router.push('/auth/signin'); return; }
+      const weight = packages?.find(pkg => pkg.id === packageId)?.net_weight_g;
+      if (!name.trim() || !description.trim() || !(Number(decimalInput(price)) > 0) || decimalInput(price) == null || !packageId || !draftValid(costingDraft, weight) ||
+          (costingDraft.cost_mode === 'manual' && decimalInput(cost) == null)) {
+        setProductMessage(t('productConfigurationInvalid')); return;
       }
-  
-      // Improved validation with specific error messages
-      const errors = [];
-      
-      if (!name) errors.push(t('productNameRequired'));
-      if (!description) errors.push(t('productDescriptionRequired'));
-      if (!price || parseFloat(price) <= 0) errors.push(t('validPriceRequired'));
-      if (costingDraft.cost_mode === 'manual' && (decimalInput(cost) == null)) errors.push(t('costingNonNegativeManual'));
-      if (!validCostingDraft(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)) errors.push(t('costingReviewComposition'));
-      if (!packageId) errors.push(t('packageRequired'));
-
-      
-      if (errors.length > 0) {
-        alert(errors.join('\n'));
-        return;
-      }
-  
-      const parsedPrice = parseFloat(price);
-      const parsedCost = decimalInput(cost);
-  
-      // Only validate the image URL if it's not empty
-      if (image.trim()) {
-        try {
-          new URL(image);
-        } catch (_) {
-          alert(t('invalidImageUrl'));
-          return;
-        }
-      }
-  
-      // Build legacy recipe links from the explicit selection.
-      const recipeIds = selectedRecipes.map(recipe => recipe.value);
-  
-      const product = {
-        name,
-        description,
-        price: parsedPrice,
-        ...(costingDraft.cost_mode === 'manual' ? { cost: parsedCost } : {}),
-        ...costingPayload(costingDraft),
-        image: image || null,
-        recipe_ids: recipeIds,
-        package_id: packageId,
+      const payload = {
+        name, description, price: decimalInput(price), image: image || null, package_id: packageId,
+        ...(costingDraft.cost_mode === 'manual' ? { cost: decimalInput(cost) } : {}),
+        ...(modern ? productConfigurationPayload(costingDraft) : { ...costingPayload(costingDraft), recipe_ids: selectedRecipes.map(recipe => recipe.value) }),
       };
-  
-      if (editingProduct) {
-        await fetcher(`/api/products/${editingProduct.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${auth.token}`,
-          },
-          body: JSON.stringify(product),
-        });
-        mutateProducts();
-      } else {
-        await fetcher('/api/products', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${auth.token}`,
-          },
-          body: JSON.stringify(product),
-        });
-        mutateProducts();
+      const saved = await fetcher(editingProduct ? `/api/products/${editingProduct.id}` : '/api/products', {
+        method: editingProduct ? 'PUT' : 'POST', headers: { 'X-Workspace-ID': selectedWorkspaceId }, body: JSON.stringify(payload),
+      }) as Product;
+      if (!current()) return;
+      if (saved.refresh_required) {
+        setSavedProductId(saved.id); setProductMessage(t('productSavedRefreshRequired'));
+        return;
       }
-
+      // A confirmed write is never repeated when the follow-up catalog read fails.
+      setSavedProductId(saved.id);
+      try { await mutateProducts(); }
+      catch { if (current()) setProductMessage(t('productSavedRefreshRequired')); return; }
+      if (!current()) return;
+      operation.current = null;
       handleCloseProductModal();
       success(editingProduct ? t('productUpdated') : t('productCreated'));
     } catch (error) {
-      showError(t('failedToSaveProduct'));
-    }
+      if (!current()) return;
+      const code = (error as { code?: string; status?: number }).status;
+      setReloadNeeded(code === 409);
+      setProductMessage(t(code === 409 ? 'productConfigurationConflict' : 'failedToSaveProduct'));
+    } finally { if (current()) operation.current = null; if (scope.current.epoch === epoch) setBusy(false); }
+  };
+
+  const refreshSavedProduct = async () => {
+    if (!savedProductId || operation.current || !selectedWorkspaceId) return;
+    const token = {}; operation.current = token; setBusy(true);
+    const epoch = scope.current.epoch;
+    try {
+      await fetcher(`/api/products/${savedProductId}`, { headers: { 'X-Workspace-ID': selectedWorkspaceId } });
+      await mutateProducts();
+      if (scope.current.epoch !== epoch || operation.current !== token) return;
+      operation.current = null; handleCloseProductModal(); success(t('productUpdated'));
+    } catch { if (scope.current.epoch === epoch) setProductMessage(t('productSavedRefreshRequired')); }
+    finally { if (operation.current === token) operation.current = null; if (scope.current.epoch === epoch) setBusy(false); }
+  };
+
+  const reloadProductConfiguration = async () => {
+    if (!editingProduct || operation.current || !selectedWorkspaceId || !window.confirm(t('productDiscardReload'))) return;
+    const token = {}; operation.current = token; setBusy(true);
+    const epoch = scope.current.epoch;
+    try {
+      const fresh = await fetcher(`/api/products/${editingProduct.id}`, { headers: { 'X-Workspace-ID': selectedWorkspaceId } });
+      if (operation.current !== token || scope.current.epoch !== epoch) return;
+      operation.current = null; handleEditProduct(fresh);
+    } catch { if (scope.current.epoch === epoch) setProductMessage(t('failedToLoadProducts')); }
+    finally { if (operation.current === token) operation.current = null; if (scope.current.epoch === epoch) setBusy(false); }
   };
 
   const handleDeleteProduct = async () => {
-    if (!editingProduct) return;
+    if (!editingProduct || operation.current || savedProductId) return;
 
     try {
       if (!auth.token) {
@@ -247,7 +252,8 @@ const Products = () => {
   const recipeOptions = recipes?.map(recipe => ({ value: recipe.id, label: recipe.name })) || [];
   const packageOptions = packages?.map(pkg => ({ value: pkg.id, label: `${pkg.name} · ${pkg.net_weight_g != null ? t('costingNetGrams', { weight: pkg.net_weight_g }) : t('costingWeightUnknown')}` })) || [];
   const productOptions = products?.map(product => ({ value: product.id, label: product.name })) || [];
-  const hasActiveFilters = !!(selectedRecipe || selectedPackage || selectedProduct);
+  const hasActiveFilters = !!(selectedRecipe || selectedPackage || selectedProduct || typeFilter);
+  const openNewProduct = () => { if (operation.current) return; setCostingDraft(modern ? emptyProductDraft() : emptyCostingDraft()); setProductMessage(''); setReloadNeeded(false); setSavedProductId(null); setShowProductModal(true); };
 
   // Check request errors.
   const hasError = productsError || recipesError || packagesError;
@@ -287,7 +293,7 @@ const Products = () => {
         </div>
         <Button
           className="btn btn-primary"
-          onClick={() => setShowProductModal(true)}
+          onClick={openNewProduct}
         >
           <FaPlus className="me-2" />
           {t('addProduct')}
@@ -296,6 +302,10 @@ const Products = () => {
 
       {/* Filter Section */}
       <FilterBar className="products-filter-bar">
+        <div className="filter-group"><SelectDropdown inputId="product-type-filter" label={t('productType')}
+          options={[{ value: 'standard', label: t('productTypeStandard') }, { value: 'assortment', label: t('productTypeAssortment') }]}
+          value={typeFilter ? { value: typeFilter, label: t(typeFilter === 'standard' ? 'productTypeStandard' : 'productTypeAssortment') } : null}
+          onChange={option => setTypeFilter(option?.value ?? null)} isClearable placeholder={t('productAllTypes')} /></div>
         <div className="filter-group">
           <SelectDropdown
             options={recipeOptions}
@@ -319,7 +329,7 @@ const Products = () => {
         <ClearFiltersButton
           label={t('clear')}
           onClick={() => {
-            setSelectedRecipe(null);
+            setTypeFilter(null); setSelectedRecipe(null);
             setSelectedPackage(null);
             setSelectedProduct(null);
           }}
@@ -379,7 +389,7 @@ const Products = () => {
           type="products"
           message={t('noProductsFound')}
           actionLabel={t('addProduct')}
-          onAction={() => setShowProductModal(true)}
+          onAction={openNewProduct}
         />
       ) : (
         <div className="products-grid">
@@ -398,6 +408,17 @@ const Products = () => {
 
       {/* Product Modal */}
       <ProductModal
+        modern={modern} busy={busy} readOnly={modern && Boolean(editingProduct && !currentProductType(editingProduct))}
+        message={productMessage} onReload={reloadNeeded ? reloadProductConfiguration : undefined} savedRefreshRequired={savedProductId != null} onRefresh={refreshSavedProduct}
+        typeControls={<section className="product-configuration-section"><h5>{t('productType')}</h5>
+          <div className="product-choice-group" role="group" aria-label={t('productType')}>
+            {(['standard', 'assortment'] as const).map(type => <Form.Check key={type} type="radio" name="productType" id={`product-type-${type}`}
+              label={t(type === 'standard' ? 'productTypeStandard' : 'productTypeAssortment')} checked={costingDraft.product_type === type}
+              onChange={() => { if (costingDraft.product_type !== type && (costingDraft.cost_recipe_id || costingDraft.components.length || costingDraft.assortment_components?.length) && !window.confirm(t('productChangeTypeConfirmation'))) return; setCostingDraft(changeProductType(costingDraft, type)); if (costingDraft.cost_mode === 'manual') setCost(''); }} />)}
+          </div></section>}
+        configurationControls={packaging => <ProductCostingEditor draft={costingDraft} onChange={next => { if (!operation.current && !savedProductId) setCostingDraft(next); }} recipes={recipes || []} products={products || []} productId={editingProduct?.id}
+          selectedPackage={packages?.find(pkg => pkg.id === packageId)} packageId={packageId} workspaceId={selectedWorkspaceId}
+          originalCost={editingProduct ? effectiveProductCost(editingProduct) : null} currency={selectedCurrency || ''} show={showProductModal} packageControls={packaging} cost={cost} setCost={setCost} />}
         show={showProductModal}
         onClose={handleCloseProductModal}
         onSave={handleSaveProductChanges}
@@ -412,8 +433,8 @@ const Products = () => {
         cost={cost}
         setCost={setCost}
         calculatedCost={costingDraft.cost_mode !== 'manual'}
-        costingValid={validCostingDraft(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)}
-        costingControls={<ProductCostingEditor draft={costingDraft} onChange={setCostingDraft} recipes={recipes || []}
+        costingValid={draftValid(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)}
+        costingControls={<LegacyProductCostingEditor draft={costingDraft} onChange={next => { if (!operation.current && !savedProductId) setCostingDraft(next); }} recipes={recipes || []}
           selectedPackage={packages?.find(pkg => pkg.id === packageId)} packageId={packageId} workspaceId={selectedWorkspaceId}
           linkedRecipes={selectedRecipes.map(row => row.value)} currency={selectedCurrency || ''} show={showProductModal} />}
         image={image}

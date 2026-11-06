@@ -1,0 +1,808 @@
+{
+  "complete": {
+    "id": 300,
+    "name": "Five flavours",
+    "description": "One common pack",
+    "price": 650,
+    "cost": 0,
+    "package_id": 42,
+    "user_id": 1,
+    "created_at": "2026-11-06T12:00:00Z",
+    "updated_at": "2026-11-06T12:00:00Z",
+    "options": [],
+    "product_type": "assortment",
+    "composition_basis": "products",
+    "recipe_id": null,
+    "cost_recipe_id": null,
+    "configuration_version": 1,
+    "assortment_components": [
+      {
+        "component_product_id": 101,
+        "quantity_g": 50,
+        "position": 0
+      },
+      {
+        "component_product_id": 102,
+        "quantity_g": 50,
+        "position": 1
+      },
+      {
+        "component_product_id": 103,
+        "quantity_g": 50,
+        "position": 2
+      },
+      {
+        "component_product_id": 104,
+        "quantity_g": 50,
+        "position": 3
+      },
+      {
+        "component_product_id": 105,
+        "quantity_g": 50,
+        "position": 4
+      }
+    ],
+    "components": [],
+    "cost_mode": "assortment",
+    "cost_estimate": {
+      "status": "complete",
+      "source": "assortment",
+      "total_cost": 270,
+      "content_cost": 250,
+      "packaging_cost": 20,
+      "known_ingredient_cost": 0,
+      "cost_per_gram": null,
+      "net_weight_g": 250,
+      "components": [
+        {
+          "recipe_id": 201,
+          "name": "Beef teriyaki",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 400.0,
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "component_product_id": 101
+        },
+        {
+          "recipe_id": 202,
+          "name": "Classic beef",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 500,
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "component_product_id": 102
+        },
+        {
+          "recipe_id": 203,
+          "name": "Chili turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 600.0,
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "component_product_id": 103
+        },
+        {
+          "recipe_id": 204,
+          "name": "BBQ chicken",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 450.0,
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "component_product_id": 104
+        },
+        {
+          "recipe_id": 205,
+          "name": "Herb turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 550.0,
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "component_product_id": 105
+        }
+      ],
+      "composition_details": [
+        {
+          "component_product_id": 101,
+          "product_name": "Beef teriyaki",
+          "recipe_id": 201,
+          "recipe_name": "Beef teriyaki",
+          "quantity_g": 50,
+          "position": 0,
+          "status": "complete",
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 102,
+          "product_name": "Classic beef",
+          "recipe_id": 202,
+          "recipe_name": "Classic beef",
+          "quantity_g": 50,
+          "position": 1,
+          "status": "complete",
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "issues": []
+        },
+        {
+          "component_product_id": 103,
+          "product_name": "Chili turkey",
+          "recipe_id": 203,
+          "recipe_name": "Chili turkey",
+          "quantity_g": 50,
+          "position": 2,
+          "status": "complete",
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 104,
+          "product_name": "BBQ chicken",
+          "recipe_id": 204,
+          "recipe_name": "BBQ chicken",
+          "quantity_g": 50,
+          "position": 3,
+          "status": "complete",
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 105,
+          "product_name": "Herb turkey",
+          "recipe_id": 205,
+          "recipe_name": "Herb turkey",
+          "quantity_g": 50,
+          "position": 4,
+          "status": "complete",
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "issues": []
+        }
+      ],
+      "issues": [],
+      "calculated_at": "2026-11-06T12:00:00Z"
+    },
+    "package": {
+      "id": 42,
+      "name": "Common pack 250 g",
+      "net_weight_g": 250,
+      "unit_cost": 20
+    }
+  },
+  "manual": {
+    "id": 300,
+    "name": "Five flavours",
+    "description": "One common pack",
+    "price": 650,
+    "cost": 290,
+    "package_id": 42,
+    "user_id": 1,
+    "created_at": "2026-11-06T12:00:00Z",
+    "updated_at": "2026-11-06T12:00:00Z",
+    "options": [],
+    "product_type": "assortment",
+    "composition_basis": "products",
+    "recipe_id": null,
+    "cost_recipe_id": null,
+    "configuration_version": 1,
+    "assortment_components": [
+      {
+        "component_product_id": 101,
+        "quantity_g": 50,
+        "position": 0
+      },
+      {
+        "component_product_id": 102,
+        "quantity_g": 50,
+        "position": 1
+      },
+      {
+        "component_product_id": 103,
+        "quantity_g": 50,
+        "position": 2
+      },
+      {
+        "component_product_id": 104,
+        "quantity_g": 50,
+        "position": 3
+      },
+      {
+        "component_product_id": 105,
+        "quantity_g": 50,
+        "position": 4
+      }
+    ],
+    "components": [],
+    "cost_mode": "manual",
+    "cost_estimate": {
+      "status": "complete",
+      "source": "manual",
+      "total_cost": 290,
+      "content_cost": null,
+      "packaging_cost": null,
+      "known_ingredient_cost": 0,
+      "cost_per_gram": null,
+      "net_weight_g": 250,
+      "components": [
+        {
+          "recipe_id": 201,
+          "name": "Beef teriyaki",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 400.0,
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "component_product_id": 101
+        },
+        {
+          "recipe_id": 202,
+          "name": "Classic beef",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 500,
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "component_product_id": 102
+        },
+        {
+          "recipe_id": 203,
+          "name": "Chili turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 600.0,
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "component_product_id": 103
+        },
+        {
+          "recipe_id": 204,
+          "name": "BBQ chicken",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 450.0,
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "component_product_id": 104
+        },
+        {
+          "recipe_id": 205,
+          "name": "Herb turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 550.0,
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "component_product_id": 105
+        }
+      ],
+      "composition_details": [
+        {
+          "component_product_id": 101,
+          "product_name": "Beef teriyaki",
+          "recipe_id": 201,
+          "recipe_name": "Beef teriyaki",
+          "quantity_g": 50,
+          "position": 0,
+          "status": "complete",
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 102,
+          "product_name": "Classic beef",
+          "recipe_id": 202,
+          "recipe_name": "Classic beef",
+          "quantity_g": 50,
+          "position": 1,
+          "status": "complete",
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "issues": []
+        },
+        {
+          "component_product_id": 103,
+          "product_name": "Chili turkey",
+          "recipe_id": 203,
+          "recipe_name": "Chili turkey",
+          "quantity_g": 50,
+          "position": 2,
+          "status": "complete",
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 104,
+          "product_name": "BBQ chicken",
+          "recipe_id": 204,
+          "recipe_name": "BBQ chicken",
+          "quantity_g": 50,
+          "position": 3,
+          "status": "complete",
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 105,
+          "product_name": "Herb turkey",
+          "recipe_id": 205,
+          "recipe_name": "Herb turkey",
+          "quantity_g": 50,
+          "position": 4,
+          "status": "complete",
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "issues": []
+        }
+      ],
+      "issues": [],
+      "calculated_at": "2026-11-06T12:00:00Z"
+    },
+    "package": {
+      "id": 42,
+      "name": "Common pack 250 g",
+      "net_weight_g": 250,
+      "unit_cost": 20
+    }
+  },
+  "incomplete": {
+    "id": 300,
+    "name": "Five flavours",
+    "description": "One common pack",
+    "price": 650,
+    "cost": 0,
+    "package_id": 42,
+    "user_id": 1,
+    "created_at": "2026-11-06T12:00:00Z",
+    "updated_at": "2026-11-06T12:00:00Z",
+    "options": [],
+    "product_type": "assortment",
+    "composition_basis": "products",
+    "recipe_id": null,
+    "cost_recipe_id": null,
+    "configuration_version": 1,
+    "assortment_components": [
+      {
+        "component_product_id": 101,
+        "quantity_g": 50,
+        "position": 0
+      },
+      {
+        "component_product_id": 102,
+        "quantity_g": 50,
+        "position": 1
+      },
+      {
+        "component_product_id": 103,
+        "quantity_g": 50,
+        "position": 2
+      },
+      {
+        "component_product_id": 104,
+        "quantity_g": 50,
+        "position": 3
+      },
+      {
+        "component_product_id": 105,
+        "quantity_g": 50,
+        "position": 4
+      }
+    ],
+    "components": [],
+    "cost_mode": "assortment",
+    "cost_estimate": {
+      "status": "incomplete",
+      "source": "assortment",
+      "total_cost": null,
+      "content_cost": 250,
+      "packaging_cost": 20,
+      "known_ingredient_cost": 0,
+      "cost_per_gram": null,
+      "net_weight_g": 250,
+      "components": [
+        {
+          "recipe_id": 202,
+          "name": "Classic beef",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 500,
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "component_product_id": 102
+        },
+        {
+          "recipe_id": 203,
+          "name": "Chili turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 600.0,
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "component_product_id": 103
+        },
+        {
+          "recipe_id": 204,
+          "name": "BBQ chicken",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 450.0,
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "component_product_id": 104
+        },
+        {
+          "recipe_id": 205,
+          "name": "Herb turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 550.0,
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "component_product_id": 105
+        }
+      ],
+      "composition_details": [
+        {
+          "component_product_id": 101,
+          "product_name": "Beef teriyaki",
+          "recipe_id": null,
+          "recipe_name": null,
+          "quantity_g": 50,
+          "position": 0,
+          "status": "incomplete",
+          "cost_per_gram": null,
+          "content_cost": null,
+          "issues": []
+        },
+        {
+          "component_product_id": 102,
+          "product_name": "Classic beef",
+          "recipe_id": 202,
+          "recipe_name": "Classic beef",
+          "quantity_g": 50,
+          "position": 1,
+          "status": "complete",
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "issues": []
+        },
+        {
+          "component_product_id": 103,
+          "product_name": "Chili turkey",
+          "recipe_id": 203,
+          "recipe_name": "Chili turkey",
+          "quantity_g": 50,
+          "position": 2,
+          "status": "complete",
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 104,
+          "product_name": "BBQ chicken",
+          "recipe_id": 204,
+          "recipe_name": "BBQ chicken",
+          "quantity_g": 50,
+          "position": 3,
+          "status": "complete",
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 105,
+          "product_name": "Herb turkey",
+          "recipe_id": 205,
+          "recipe_name": "Herb turkey",
+          "quantity_g": 50,
+          "position": 4,
+          "status": "complete",
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "issues": []
+        }
+      ],
+      "issues": [
+        {
+          "code": "missing_recipe",
+          "message": "Select a primary recipe",
+          "component_product_id": 101
+        }
+      ],
+      "calculated_at": "2026-11-06T12:00:00Z"
+    },
+    "package": {
+      "id": 42,
+      "name": "Common pack 250 g",
+      "net_weight_g": 250,
+      "unit_cost": 20
+    }
+  },
+  "unknown_type": {
+    "id": 300,
+    "name": "Five flavours",
+    "description": "One common pack",
+    "price": 650,
+    "cost": 0,
+    "package_id": 42,
+    "user_id": 1,
+    "created_at": "2026-11-06T12:00:00Z",
+    "updated_at": "2026-11-06T12:00:00Z",
+    "options": [],
+    "product_type": "future_type",
+    "composition_basis": "products",
+    "recipe_id": null,
+    "cost_recipe_id": null,
+    "configuration_version": 1,
+    "assortment_components": [
+      {
+        "component_product_id": 101,
+        "quantity_g": 50,
+        "position": 0
+      },
+      {
+        "component_product_id": 102,
+        "quantity_g": 50,
+        "position": 1
+      },
+      {
+        "component_product_id": 103,
+        "quantity_g": 50,
+        "position": 2
+      },
+      {
+        "component_product_id": 104,
+        "quantity_g": 50,
+        "position": 3
+      },
+      {
+        "component_product_id": 105,
+        "quantity_g": 50,
+        "position": 4
+      }
+    ],
+    "components": [],
+    "cost_mode": "assortment",
+    "cost_estimate": {
+      "status": "complete",
+      "source": "assortment",
+      "total_cost": 270,
+      "content_cost": 250,
+      "packaging_cost": 20,
+      "known_ingredient_cost": 0,
+      "cost_per_gram": null,
+      "net_weight_g": 250,
+      "components": [
+        {
+          "recipe_id": 201,
+          "name": "Beef teriyaki",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 400.0,
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "component_product_id": 101
+        },
+        {
+          "recipe_id": 202,
+          "name": "Classic beef",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 500,
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "component_product_id": 102
+        },
+        {
+          "recipe_id": 203,
+          "name": "Chili turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 600.0,
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "component_product_id": 103
+        },
+        {
+          "recipe_id": 204,
+          "name": "BBQ chicken",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 450.0,
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "component_product_id": 104
+        },
+        {
+          "recipe_id": 205,
+          "name": "Herb turkey",
+          "quantity_g": 50,
+          "planned_yield_g": 500,
+          "recipe_cost": 550.0,
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "component_product_id": 105
+        }
+      ],
+      "composition_details": [
+        {
+          "component_product_id": 101,
+          "product_name": "Beef teriyaki",
+          "recipe_id": 201,
+          "recipe_name": "Beef teriyaki",
+          "quantity_g": 50,
+          "position": 0,
+          "status": "complete",
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 102,
+          "product_name": "Classic beef",
+          "recipe_id": 202,
+          "recipe_name": "Classic beef",
+          "quantity_g": 50,
+          "position": 1,
+          "status": "complete",
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "issues": []
+        },
+        {
+          "component_product_id": 103,
+          "product_name": "Chili turkey",
+          "recipe_id": 203,
+          "recipe_name": "Chili turkey",
+          "quantity_g": 50,
+          "position": 2,
+          "status": "complete",
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 104,
+          "product_name": "BBQ chicken",
+          "recipe_id": 204,
+          "recipe_name": "BBQ chicken",
+          "quantity_g": 50,
+          "position": 3,
+          "status": "complete",
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 105,
+          "product_name": "Herb turkey",
+          "recipe_id": 205,
+          "recipe_name": "Herb turkey",
+          "quantity_g": 50,
+          "position": 4,
+          "status": "complete",
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "issues": []
+        }
+      ],
+      "issues": [],
+      "calculated_at": "2026-11-06T12:00:00Z"
+    },
+    "package": {
+      "id": 42,
+      "name": "Common pack 250 g",
+      "net_weight_g": 250,
+      "unit_cost": 20
+    }
+  },
+  "legacy_manual": {
+    "id": 1,
+    "name": "Legacy manual",
+    "description": "",
+    "price": 10,
+    "cost": 0,
+    "package_id": 42,
+    "user_id": 1,
+    "created_at": "2026-11-06T12:00:00Z",
+    "updated_at": "2026-11-06T12:00:00Z",
+    "options": [],
+    "cost_mode": "manual"
+  },
+  "snapshot": {
+    "version": 1,
+    "source": "manual",
+    "amount": 290,
+    "calculated_at": "2026-11-06T12:00:00Z",
+    "provenance": {
+      "product_type": "assortment",
+      "product_name": "Five flavours",
+      "composition_basis": "products",
+      "components": [
+        {
+          "component_product_id": 101,
+          "product_name": "Beef teriyaki",
+          "recipe_id": 201,
+          "recipe_name": "Beef teriyaki",
+          "quantity_g": 50,
+          "position": 0,
+          "status": "complete",
+          "cost_per_gram": 0.8,
+          "content_cost": 40.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 102,
+          "product_name": "Classic beef",
+          "recipe_id": 202,
+          "recipe_name": "Classic beef",
+          "quantity_g": 50,
+          "position": 1,
+          "status": "complete",
+          "cost_per_gram": 1,
+          "content_cost": 50,
+          "issues": []
+        },
+        {
+          "component_product_id": 103,
+          "product_name": "Chili turkey",
+          "recipe_id": 203,
+          "recipe_name": "Chili turkey",
+          "quantity_g": 50,
+          "position": 2,
+          "status": "complete",
+          "cost_per_gram": 1.2,
+          "content_cost": 60.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 104,
+          "product_name": "BBQ chicken",
+          "recipe_id": 204,
+          "recipe_name": "BBQ chicken",
+          "quantity_g": 50,
+          "position": 3,
+          "status": "complete",
+          "cost_per_gram": 0.9,
+          "content_cost": 45.0,
+          "issues": []
+        },
+        {
+          "component_product_id": 105,
+          "product_name": "Herb turkey",
+          "recipe_id": 205,
+          "recipe_name": "Herb turkey",
+          "quantity_g": 50,
+          "position": 4,
+          "status": "complete",
+          "cost_per_gram": 1.1,
+          "content_cost": 55.0,
+          "issues": []
+        }
+      ],
+      "package": {
+        "id": 42,
+        "name": "Common pack 250 g",
+        "net_weight_g": 250,
+        "unit_cost": 20
+      }
+    }
+  },
+  "legacy_snapshot": {
+    "version": 1,
+    "source": "manual",
+    "amount": 25,
+    "calculated_at": "2026-11-06T12:00:00Z"
+  }
+}

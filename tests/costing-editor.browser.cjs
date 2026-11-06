@@ -13,6 +13,8 @@ async function setup(locale = 'en', mobile = false, account = locale) {
   const browser = await chromium.launch({ headless: true, ...(process.env.COSTING_QA_CHROME ? { executablePath: process.env.COSTING_QA_CHROME } : {}) });
   try {
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 900 } : { width: 1440, height: 1100 } });
+  // Exercise the compatibility editor against the current backend.
+  await context.route(`${api}/api/workspaces**`, async route => { const response = await route.fetch(); const body = await response.json(); const legacy = value => { const { capabilities, ...rest } = value; return rest; }; await route.fulfill({ response, json: Array.isArray(body) ? body.map(legacy) : legacy(body) }); });
   await context.route(`${web}/config.js`, route => route.fulfill({ contentType: 'application/javascript', body: `window.__RUNTIME_CONFIG__={API_URL:${JSON.stringify(api)}}` }));
   if (!cachedTokens.has(username)) {
     const login = await context.request.post(`${api}/api/auth/login`, { data: { username, password: 'local-costing-qa' } });

@@ -16,7 +16,7 @@ export default function CostBreakdown({ estimate, currency, compact = false }: {
       {estimate.source !== 'manual' && <>
         <div className="table-responsive"><table className="table table-sm mt-2">
           <thead><tr><th scope="col">{t('costingRecipeFlavour')}</th><th scope="col">{t('costingGrams')}</th><th scope="col">{t('costingContentCost')}</th></tr></thead>
-          <tbody>{estimate.components.map((row, index) => <tr key={`${row.recipe_id}-${index}`}>
+          <tbody>{estimate.composition_details?.length ? estimate.composition_details.map((row, index) => <tr key={`${row.component_product_id}-${index}`}><td>{row.product_name || row.recipe_name}</td><td>{row.quantity_g}</td><td>{money(row.content_cost)}</td></tr>) : estimate.components.map((row, index) => <tr key={`${row.recipe_id}-${index}`}>
             <td>{row.name || t('costingRecipeReference', { id: row.recipe_id })}<div className="small text-secondary">{t('costingKnownSubtotal')}: {money(row.recipe_cost)} · {t('costingPlannedYield')}: {t('costingGramsValue', { weight: row.planned_yield_g ?? t('costingUnknown') })}{row.cost_per_gram != null && <> · {t('costingFinishedContent')}: {money(row.cost_per_gram * 1000)} / kg</>}</div></td>
             <td>{row.quantity_g}</td><td>{money(row.content_cost)}</td>
           </tr>)}</tbody>

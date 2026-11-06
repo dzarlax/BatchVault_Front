@@ -873,6 +873,7 @@ const Dashboard = () => {
         onSave={handleSaveOrderChanges}
         clientOptions={clientOptions}
         productOptions={productOptions}
+        products={products}
         statusOptions={statusOptions}
         clientId={clientId}
         status={status}

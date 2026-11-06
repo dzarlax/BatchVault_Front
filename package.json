@@ -12,7 +12,7 @@
     "start:next": "next start",
     "lint": "next lint",
     "depcheck": "node --loader ts-node/esm ./node_modules/.bin/depcheck",
-    "test:costing": "node --test tests/order-cost-refresh.test.cjs",
+    "test:costing": "node --test tests/order-cost-refresh.test.cjs tests/product-types.test.cjs",
     "test:costing:browser": "node tests/run-costing-browser.cjs"
   },
   "dependencies": {

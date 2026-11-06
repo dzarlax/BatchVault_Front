@@ -1,5 +1,8 @@
 import React, { forwardRef } from 'react';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
+
+// Keep the empty active descendant stable between server rendering and Apple browsers.
+const StableInput = (props: any) => <components.Input {...props} aria-activedescendant={props['aria-activedescendant'] || ''} />;
 
 export interface SelectDropdownProps {
   label?: string;
@@ -35,6 +38,7 @@ const SelectDropdown = forwardRef<any, SelectDropdownProps>(
     ...props
   }, ref) => {
     const generatedInstanceId = React.useId().replace(/:/g, '');
+    const controlInputId = props.inputId || `${instanceId || generatedInstanceId}-input`;
     // Default styles to ensure dropdown is always on top
     const defaultStyles = {
       menuPortal: (base: any) => ({
@@ -59,7 +63,7 @@ const SelectDropdown = forwardRef<any, SelectDropdownProps>(
     return (
       <div className="select-dropdown-wrapper">
         {label && (
-          <label className="form-label">
+          <label className="form-label" htmlFor={controlInputId}>
             {Icon && <Icon className="me-2" />}
             {label}
             {required && <span className="text-error ms-1">*</span>}
@@ -76,6 +80,8 @@ const SelectDropdown = forwardRef<any, SelectDropdownProps>(
           menuPosition={'fixed'}
           styles={styles}
           {...props}
+          inputId={controlInputId}
+          components={{ Input: StableInput, ...props.components }}
         />
         {helperText && !error && (
           <small className="form-text text-tertiary">{helperText}</small>
