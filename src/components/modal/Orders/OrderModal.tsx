@@ -1,6 +1,6 @@
 import React from 'react';
 import { OrderItem } from '../../../types/api';
-import { calculatedSnapshot } from '../../../utils/costing';
+import { calculatedSnapshot, costSourceLabel } from '../../../utils/costing';
 import { Modal, Form, Button, FormControl } from 'react-bootstrap';
 import { FaTimes } from 'react-icons/fa';
 import useTranslation from 'next-translate/useTranslation';
@@ -163,7 +163,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         <SelectDropdown
                           isDisabled={isBusy}
                           options={productOptions}
-                          value={item.product_id > 0 ? (productOptions.find(option => option.value === item.product_id) ?? { value: item.product_id, label: `Unavailable product #${item.product_id}` }) : null}
+                          value={item.product_id > 0 ? (productOptions.find(option => option.value === item.product_id) ?? { value: item.product_id, label: t('costingUnavailableProduct', { id: item.product_id }) }) : null}
                           onChange={option => handleProductChange(index, option?.value || 0)}
                           placeholder={t('selectProduct')}
                           label={t('product')}
@@ -208,8 +208,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         />
                       </Form.Group>
                     </div>
-                    <p className="small text-secondary mb-1">{item.id && !item.cost_source ? 'Saved order cost' : 'Current estimate for review'} · {item.cost_snapshot?.source || item.cost_source || 'manual'}</p>
-                    {!item.cost_snapshot && (item.cost_source === 'recipe' || item.cost_source === 'assortment') && <Button size="sm" variant="outline-secondary" onClick={() => void runOperation(() => handleRefreshItemCost(index))}>Refresh estimated cost</Button>}
+                    <p className="small text-secondary mb-1">{item.id && !item.cost_source ? t('costingSavedOrderCost') : t('costingCurrentEstimate')} · {costSourceLabel(item.cost_snapshot?.source || item.cost_source, t)}</p>
+                    {!item.cost_snapshot && (item.cost_source === 'recipe' || item.cost_source === 'assortment') && <Button size="sm" variant="outline-secondary" onClick={() => void runOperation(() => handleRefreshItemCost(index))}>{t('costingRefreshEstimate')}</Button>}
                   </div>
                 </div>
               ))}

@@ -79,8 +79,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
     if (!name.trim()) validationErrors.push(t('productNameRequired'));
     if (!description.trim()) validationErrors.push(t('productDescriptionRequired'));
     if (!price || parseFloat(price) <= 0) validationErrors.push(t('validPriceRequired'));
-    if (!calculatedCost && decimalInput(cost) == null) validationErrors.push('Enter a non-negative manual cost.');
-    if (!costingValid) validationErrors.push('Review the costing recipes and fixed component weights.');
+    if (!calculatedCost && decimalInput(cost) == null) validationErrors.push(t('costingNonNegativeManual'));
+    if (!costingValid) validationErrors.push(t('costingReviewWeights'));
     if (!packageId) validationErrors.push(t('packageRequired'));
 
     
@@ -329,7 +329,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   <div className="product-modal-field-header d-flex align-items-center mb-2">
                     <Form.Label className="mb-0 me-1">
                       <FaUtensils className="me-1" />
-                      {t("recipes")} (optional links)
+                      {t("recipes")} ({t("costingOptionalLinks")})
                     </Form.Label>
                     {selectedRecipes.length > 0 && (
                       <span className="badge bg-primary ms-2">
@@ -347,7 +347,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     placeholder={t("chooseRecipe")}
                     closeMenuOnSelect={false}
                     error={isFieldInvalid('recipes') ? t('atLeastOneRecipeRequired') : undefined}
-                    helperText="Optional links; costing uses the explicitly selected source below."
+                    helperText={t('costingLegacyLinksHelp')}
                   />
                 </Form.Group>
               </Col>

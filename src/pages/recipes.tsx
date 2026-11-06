@@ -1,4 +1,4 @@
-import { invalidateCosting } from '../utils/costing';
+import { invalidateCosting, costIssues } from '../utils/costing';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
@@ -396,14 +396,14 @@ const Recipes: React.FC = () => {
             </div>
           </div>
           <div className="recipe-detail-cost">
-            <span className="recipe-cost-label">{recipe.cost_estimate?.status === 'complete' ? 'Ingredient subtotal' : 'Known ingredient subtotal'}</span>
+            <span className="recipe-cost-label">{recipe.cost_estimate?.status === 'complete' ? t('costingIngredientSubtotal') : t('costingKnownSubtotal')}</span>
             <strong>{formatCost(recipe.total_cost)}</strong>
           </div>
         </div>
 
         <div className="mb-3 small">
-          <p className="mb-1">Planned finished yield: <strong>{recipe.planned_yield_g ?? 'Unknown'} g</strong></p>
-          {recipe.cost_estimate?.status === 'complete' && recipe.cost_estimate.cost_per_gram != null ? <p>Finished content: {(recipe.cost_estimate.cost_per_gram * 1000).toFixed(2)} {selectedCurrency || ''} / kg</p> : <div className="alert alert-warning py-2">Incomplete content calculation: {recipe.cost_estimate?.issues?.map((issue: any) => issue.message).join('; ') || 'Cost source information is unavailable'}</div>}
+          <p className="mb-1">{t('costingPlannedYield')}: <strong>{t('costingGramsValue', { weight: recipe.planned_yield_g ?? t('costingUnknown') })}</strong></p>
+          {recipe.cost_estimate?.status === 'complete' && recipe.cost_estimate.cost_per_gram != null ? <p>{t('costingFinishedContent')}: {(recipe.cost_estimate.cost_per_gram * 1000).toFixed(2)} {selectedCurrency || ''} / kg</p> : <div className="alert alert-warning py-2">{t('costingIncompleteContent')}: {costIssues(recipe.cost_estimate, t)}</div>}
         </div>
         {recipeIngredients.length > 0 ? (
           <div className="recipe-detail-table">
@@ -417,7 +417,7 @@ const Recipes: React.FC = () => {
                 <span className="recipe-detail-ingredient">{ri.ingredient?.name || t('unknown')}</span>
                 <span className="recipe-detail-quantity">{ri.quantity} {ri.unit}</span>
                 <span className={ri.cost_status === 'incomplete' || isMissingCost(ri.calculated_cost) ? 'recipe-detail-cost-missing' : ''}>
-                  {ri.cost_status === 'incomplete' ? 'Unavailable' : formatCost(ri.calculated_cost)}
+                  {ri.cost_status === 'incomplete' ? t('costingUnavailable') : formatCost(ri.calculated_cost)}
                 </span>
               </div>
             ))}
@@ -561,7 +561,7 @@ const Recipes: React.FC = () => {
                     aria-pressed={isSelected}
                   >
                     <span className="recipe-list-name">{recipe.name}</span>
-                    <span className="recipe-list-cost">{recipe.cost_estimate?.status === 'complete' ? 'Ingredient subtotal: ' : 'Known subtotal: '}{formatCost(recipe.total_cost)}</span>
+                    <span className="recipe-list-cost">{recipe.cost_estimate?.status === 'complete' ? `${t('costingIngredientSubtotal')}: ` : `${t('costingKnownSubtotal')}: `}{formatCost(recipe.total_cost)}</span>
                     <span className="recipe-list-meta">
                       {formatCount(t, recipeIngredients.length, 'ingredient')}
                       {missingCostCount > 0 && ` · ${formatCount(t, missingCostCount, 'missingCost')}`}

@@ -36,3 +36,17 @@ test('persisted snapshots cannot be repriced by a quote refresh', async () => {
   await assert.rejects(refreshOrderItemEstimate({ ...original, cost_snapshot: { version: 1, source: 'recipe', amount: 310 } }, async () => { reads++; return product; }), /cannot be refreshed/);
   assert.equal(reads, 0);
 });
+
+for (const locale of ['en', 'ru', 'rs']) {
+  test(`costing issues and order quote feedback are localized in ${locale}`, async () => {
+    const messages = require(`../locales/${locale}/common.json`);
+    const t = key => { assert.ok(messages[key], `Missing ${locale} translation: ${key}`); return messages[key]; };
+    const { costIssues, costSourceLabel } = require('../src/utils/costing.ts');
+    const incomplete = { ...product, cost_estimate: { ...product.cost_estimate, status: 'incomplete', total_cost: null,
+      issues: [{ code: 'missing_yield', message: 'Untranslated server detail' }] } };
+    assert.equal(costIssues(incomplete.cost_estimate, t), messages.costingIssue_missing_yield);
+    assert.equal(costSourceLabel('recipe', t), messages.costingModeRecipe);
+    await assert.rejects(refreshOrderItemEstimate(original, async () => incomplete, t), error => error.message === messages.costingIssue_missing_yield);
+    assert.equal(costIssues({ issues: [{ code: 'future_issue', message: 'Untranslated server detail' }] }, t), messages.costingInformationUnavailable);
+  });
+}

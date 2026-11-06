@@ -353,7 +353,7 @@ const Dashboard = () => {
         try { await fetcher(`/api/orders/${editingOrder.id}`, { headers: workspace ? { 'X-Workspace-ID': workspace } : {} }); }
         catch (readError) {
           if (activeCostWorkspace.current !== context) return;
-          handleCloseOrderModal(); showError('Order saved, but details could not be refreshed. Retry the read, not the save.'); mutateOrders(); return;
+          handleCloseOrderModal(); showError(t('costingSavedReadFailed')); mutateOrders(); return;
         }
         if (activeCostWorkspace.current !== context) return;
         // Refresh orders data
@@ -366,7 +366,7 @@ const Dashboard = () => {
       if (activeCostWorkspace.current !== context) return;
       await invalidateCosting(workspace);
       if (activeCostWorkspace.current !== context) return;
-      showError(error instanceof Error ? error.message : t('failedToSaveOrder'));
+      showError((error as { status?: number })?.status === 409 ? t('costingQuoteChanged') : error instanceof Error ? error.message : t('failedToSaveOrder'));
     }
   };
 
@@ -382,7 +382,7 @@ const Dashboard = () => {
         return;
       }
       const cost = effectiveProductCost(product);
-      if (cost == null) { showError(costIssues(product.cost_estimate)); return; }
+      if (cost == null) { showError(costIssues(product.cost_estimate, t)); return; }
       updatedItems[index] = { ...createOrderItemFromProduct(product), id: items[index].id, cost_source: product.cost_mode || 'manual' };
       setItems(updatedItems);
     }
@@ -398,13 +398,13 @@ const Dashboard = () => {
     const context = activeCostWorkspace.current;
     const workspace = context.workspace;
     try {
-      const patch = await refreshOrderItemEstimate(item, productId => fetcher(`/api/products/${productId}`, { headers: { 'X-Workspace-ID': workspace } }));
+      const patch = await refreshOrderItemEstimate(item, productId => fetcher(`/api/products/${productId}`, { headers: { 'X-Workspace-ID': workspace } }), t);
       if (activeCostWorkspace.current !== context) return;
       setItems(current => current.map((row, i) =>
         i === index && row.id === item.id && row.product_id === item.product_id && !row.cost_snapshot ? { ...row, ...patch } : row
       ));
     } catch (error) {
-      if (activeCostWorkspace.current === context) showError(error instanceof Error ? error.message : 'Unable to refresh estimated cost');
+      if (activeCostWorkspace.current === context) showError(t('costingRefreshFailed'));
     }
   };
 

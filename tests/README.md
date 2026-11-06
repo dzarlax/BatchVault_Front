@@ -24,3 +24,9 @@ On both `/` and `/orders`, the test adds a five-unit row, submits the stale quot
 With `COSTING_QA_CURRENCY=EUR`, the default synthetic workspace must use EUR and include recipe `QA flavour 1`. A third browser case verifies that its finished-content rate, the product cost, and the cost preview all display EUR. Numerical amounts are unchanged.
 
 Both order scenarios also hold the GET after a successful PUT. While that read is pending, Save, quantity changes, Add Product and Cancel must be disabled, and only one PUT may be sent. Releasing the GET then closes the saved editor without changing its draft fields.
+
+The browser runner executes the editor and order suites in separate API request windows (61 seconds apart). This preserves the backend's global per-IP limit, which runs before JWT authentication. Do not remove application rate limiting for these checks.
+
+The editor suite covers nested packaging cost changes and initial net weight assignment without changing the selected package ID, plus Russian desktop and Serbian mobile costing controls, shared dropdown interactions, translated issue/validation messages and recipe yield labels. `COSTING_QA_SCREENSHOTS` optionally selects an output directory for synthetic-data screenshots.
+
+For independently owned fixture records, set `COSTING_QA_EDITOR_USER_PREFIX` and seed four accounts ending in `cost`, `weight`, `ru`, and `rs`. Each needs the same synthetic product/recipe/package fixture contract and password as above. Without the prefix, the editor cases use `costing-qa` and restore the original product package after each packaging scenario. Fixture credentials are for disposable localhost data only.

@@ -84,7 +84,7 @@ const AddPriceModal: React.FC<AddPriceModalProps> = ({
     const validationErrors = [];
     
     if (!ingredientId) validationErrors.push(t('ingredientRequired'));
-    if (decimalInput(price) == null) validationErrors.push('Enter a non-negative price; explicit zero is allowed.');
+    if (decimalInput(price) == null) validationErrors.push(t('costingNonNegativePrice'));
     if (!isPositiveDecimalInput(quantity)) validationErrors.push(t('validQuantityRequired'));
     if (!unit) validationErrors.push(t('unitRequired'));
     

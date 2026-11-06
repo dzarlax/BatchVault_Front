@@ -140,8 +140,8 @@ const Products = () => {
       if (!name) errors.push(t('productNameRequired'));
       if (!description) errors.push(t('productDescriptionRequired'));
       if (!price || parseFloat(price) <= 0) errors.push(t('validPriceRequired'));
-      if (costingDraft.cost_mode === 'manual' && (decimalInput(cost) == null)) errors.push('Enter a non-negative manual cost.');
-      if (!validCostingDraft(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)) errors.push('Review the content-only recipes, select a source and make component grams match the package.');
+      if (costingDraft.cost_mode === 'manual' && (decimalInput(cost) == null)) errors.push(t('costingNonNegativeManual'));
+      if (!validCostingDraft(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)) errors.push(t('costingReviewComposition'));
       if (!packageId) errors.push(t('packageRequired'));
 
       
@@ -202,7 +202,7 @@ const Products = () => {
       handleCloseProductModal();
       success(editingProduct ? t('productUpdated') : t('productCreated'));
     } catch (error) {
-      showError(error instanceof Error ? error.message : t('failedToSaveProduct'));
+      showError(t('failedToSaveProduct'));
     }
   };
 
@@ -245,7 +245,7 @@ const Products = () => {
   };
 
   const recipeOptions = recipes?.map(recipe => ({ value: recipe.id, label: recipe.name })) || [];
-  const packageOptions = packages?.map(pkg => ({ value: pkg.id, label: `${pkg.name}${pkg.net_weight_g != null ? ` · ${pkg.net_weight_g} g net` : ' · weight unknown'}` })) || [];
+  const packageOptions = packages?.map(pkg => ({ value: pkg.id, label: `${pkg.name} · ${pkg.net_weight_g != null ? t('costingNetGrams', { weight: pkg.net_weight_g }) : t('costingWeightUnknown')}` })) || [];
   const productOptions = products?.map(product => ({ value: product.id, label: product.name })) || [];
   const hasActiveFilters = !!(selectedRecipe || selectedPackage || selectedProduct);
 

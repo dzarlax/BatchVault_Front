@@ -35,9 +35,13 @@ export const effectiveProductCost = (product: Pick<Product, 'cost' | 'cost_estim
   return Number.isFinite(product.cost) ? product.cost : null;
 };
 export const calculatedSnapshot = (snapshot?: { source: string } | null) => snapshot?.source === 'recipe' || snapshot?.source === 'assortment';
-export const costSourceLabel = (source?: string) => source === 'recipe' ? 'From recipe' : source === 'assortment' ? 'Assortment' : 'Manual';
+export type CostingTranslate = (key: string, values?: Record<string, unknown>) => string;
+export const costSourceLabel = (source?: string, t?: CostingTranslate) => source === 'recipe' ? (t?.('costingModeRecipe') ?? 'From recipe') : source === 'assortment' ? (t?.('costingModeAssortment') ?? 'Assortment') : (t?.('costingModeManual') ?? 'Manual');
+const knownCostIssues = new Set(['empty_recipe', 'missing_ingredient', 'packaging_in_recipe', 'missing_price', 'invalid_quantity', 'invalid_price_quantity', 'invalid_price', 'incompatible_units', 'amount_out_of_range', 'missing_yield', 'invalid_manual_cost', 'missing_package', 'missing_package_weight', 'missing_package_cost', 'missing_recipe', 'invalid_cost_mode', 'invalid_composition', 'weight_mismatch']);
+export const costIssueMessage = (issue: { code?: string; message: string }, t?: CostingTranslate) =>
+  t ? t(issue.code && knownCostIssues.has(issue.code) ? `costingIssue_${issue.code}` : 'costingInformationUnavailable') : issue.message;
 export const invalidateCosting = (workspaceId: string | null | undefined) => mutate((key: unknown) =>
   Array.isArray(key) && key[1] === workspaceId && typeof key[0] === 'string' &&
   ['/api/products', '/api/recipes', '/api/packages', '/api/prices', '/api/workspace-ingredients'].some(prefix => key[0] === prefix || key[0].startsWith(`${prefix}/`))
 );
-export const costIssues = (estimate?: CostEstimate | null) => estimate?.issues.map(issue => issue.message).join('; ') || 'Cost information is unavailable';
+export const costIssues = (estimate?: CostEstimate | null, t?: CostingTranslate) => estimate?.issues.map(issue => costIssueMessage(issue, t)).join('; ') || t?.('costingInformationUnavailable') || 'Cost information is unavailable';

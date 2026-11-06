@@ -27,7 +27,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const costingRecipeIds = product.cost_mode === 'recipe' && product.cost_recipe_id ? [product.cost_recipe_id]
     : product.cost_mode === 'assortment' ? (product.components || []).map(row => row.recipe_id) : [];
   const recipeNames = costingRecipeIds.length > 0 ? costingRecipeIds.map(id =>
-    product.cost_estimate?.components.find(row => row.recipe_id === id)?.name || recipes.find(recipe => recipe.id === id)?.name || `Recipe #${id}`
+    product.cost_estimate?.components.find(row => row.recipe_id === id)?.name || recipes.find(recipe => recipe.id === id)?.name || t('costingRecipeReference', { id })
   ) : (product.options || []).map(option => option.recipe?.name?.trim() || recipes.find(recipe => recipe.id === option.recipe_id)?.name).filter((name): name is string => Boolean(name));
   const visibleRecipeNames = recipeNames.slice(0, 2).join(', ');
   const hiddenRecipeCount = Math.max(recipeNames.length - 2, 0);
@@ -77,7 +77,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
         </div>
 
-        {product.package?.net_weight_g != null && <p className="small text-secondary">{product.package.net_weight_g} g net</p>}
+        {product.package?.net_weight_g != null && <p className="small text-secondary">{t('costingNetGrams', { weight: product.package.net_weight_g })}</p>}
         <div className="product-card-metrics">
           <div className="product-metric">
             <span className="product-metric-label">{t('price')}:</span>
@@ -86,20 +86,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           <div className="product-metric">
             <span className="product-metric-label">{t('cost')}:</span>
-            <span className="product-metric-value cost">{currentCost == null ? 'Unavailable' : formatMoney(currentCost)}</span>
+            <span className="product-metric-value cost">{currentCost == null ? t('costingUnavailable') : formatMoney(currentCost)}</span>
           </div>
 
           <div className="product-metric">
             <span className="product-metric-label">{t('profit')}:</span>
             <span className={`product-metric-value ${profit != null && profit >= 0 ? 'price' : 'cost'}`}>
-              {profit == null ? 'Unavailable' : formatMoney(profit)}
+              {profit == null ? t('costingUnavailable') : formatMoney(profit)}
             </span>
           </div>
 
           <div className="product-metric">
             <span className="product-metric-label">{t('margin')}:</span>
             <span className={`product-metric-value ${profit != null && profit >= 0 ? 'price' : 'cost'}`}>
-              {profitMargin == null ? 'Unavailable' : `${profitMargin}%`}
+              {profitMargin == null ? t('costingUnavailable') : `${profitMargin}%`}
             </span>
           </div>
         </div>
