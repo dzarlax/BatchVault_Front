@@ -79,3 +79,32 @@ export const commitEditorWrite = async <T>({ write, acknowledge, refresh, requir
   try { await refresh(); }
   catch (error) { if (isCurrent()) requireRefresh(); }
 };
+
+export interface RecipeCreationRequest {
+  headers: Record<string, string>;
+  body: string;
+  ingredientBodies: readonly string[];
+}
+
+// Finish a submitted composition in its original workspace, independently of the visible editor.
+export const createRecipeWithIngredients = async (
+  request: RecipeCreationRequest,
+  send: (endpoint: string, options: { method: 'POST' | 'DELETE'; headers: Readonly<Record<string, string>>; body?: string }) => Promise<any>,
+): Promise<any> => {
+  const headers = Object.freeze({ ...request.headers });
+  const body = request.body;
+  const ingredientBodies = [...request.ingredientBodies];
+  const created = await send('/api/recipes', { method: 'POST', headers, body });
+  if (!created?.id) throw new Error('Failed to create recipe');
+  const recipeId = created.id;
+  try {
+    for (const ingredientBody of ingredientBodies) {
+      const added = await send(`/api/recipes/${recipeId}/ingredients`, { method: 'POST', headers, body: ingredientBody });
+      if (!added) throw new Error('Failed to add ingredient');
+    }
+  } catch (error) {
+    await send(`/api/recipes/${recipeId}`, { method: 'DELETE', headers }).catch(() => undefined);
+    throw new Error('Failed to add ingredient', { cause: error });
+  }
+  return created;
+};

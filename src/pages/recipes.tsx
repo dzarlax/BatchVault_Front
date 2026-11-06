@@ -19,7 +19,7 @@ import { useWorkspace } from '../utils/workspaceContext';
 import { workspaceFetcher, workspaceKey } from '../utils/workspaceSWR';
 import { WorkspaceIngredient } from '../types/api';
 import { ClearFiltersButton, FilterBar, SearchFilter } from '../components/filters/FilterBar';
-import { advanceEditorOperationScope, commitEditorWrite, EditorOperationScope } from '../utils/editorDraftState';
+import { advanceEditorOperationScope, commitEditorWrite, createRecipeWithIngredients, EditorOperationScope } from '../utils/editorDraftState';
 
 const Recipes: React.FC = () => {
   const { auth } = useAuth();
@@ -229,23 +229,24 @@ const Recipes: React.FC = () => {
       showError(t('invalidRecipeFormat'));
       return;
     }
-    const response = await fetcher('/api/recipes', {
-      method: 'POST', headers: recipeHeaders(context),
+    const request = {
+      headers: recipeHeaders(context),
       body: JSON.stringify({ name: `${editingRecipe.name} (Copy)`, planned_yield_g: editingRecipe.planned_yield_g ?? null }),
-    });
-    if (!isCurrentRecipeContext(context)) return;
-    if (!response) { showError(t('failedToCloneRecipe')); return; }
-    for (const ingredient of recipeIngredients) {
-      if (!ingredient.ingredient_id) continue;
-      await fetcher(`/api/recipes/${response.id}/ingredients`, {
-        method: 'POST', headers: recipeHeaders(context),
-        body: JSON.stringify({ ingredient_id: ingredient.ingredient_id, quantity: ingredient.quantity, unit: ingredient.unit }),
-      });
+      ingredientBodies: recipeIngredients.filter(ingredient => ingredient.ingredient_id).map(ingredient => JSON.stringify({
+        ingredient_id: ingredient.ingredient_id, quantity: ingredient.quantity, unit: ingredient.unit,
+      })),
+    };
+    try {
+      await createRecipeWithIngredients(request, fetcher);
       if (!isCurrentRecipeContext(context)) return;
+      void loadRecipes();
+      setShowModal(false);
+      success(t('recipeCloned'));
+    } catch (error) {
+      if (!isCurrentRecipeContext(context)) return;
+      showError(t('failedToCloneRecipe'));
+      throw error;
     }
-    void loadRecipes();
-    setShowModal(false);
-    success(t('recipeCloned'));
   };
 
   const refreshEditingRecipe = async (recipeId: number, context = recipeContext()) => {
@@ -301,36 +302,22 @@ const Recipes: React.FC = () => {
   const handleCreateRecipe = async (name: string, ingredients: any[], plannedYield?: number | null) => {
     const context = recipeContext();
     if (!showCreateModal || !ensureRecipeMutationAllowed(context)) return;
+    const request = {
+      headers: recipeHeaders(context),
+      body: JSON.stringify({ name, planned_yield_g: plannedYield ?? null }),
+      ingredientBodies: ingredients.map(ingredient => JSON.stringify({
+        ingredient_id: ingredient.id, quantity: ingredient.quantity, unit: ingredient.unit.value,
+      })),
+    };
     try {
-      const response = await fetcher('/api/recipes', {
-        method: 'POST', headers: recipeHeaders(context),
-        body: JSON.stringify({ name, planned_yield_g: plannedYield ?? null }),
-      });
+      await createRecipeWithIngredients(request, fetcher);
       if (!isCurrentRecipeContext(context)) return;
-      if (!response) throw new Error('Failed to create recipe');
-      const recipeId = response.id;
-      try {
-        for (const ingredient of ingredients) {
-          const ingredientResponse = await fetcher(`/api/recipes/${recipeId}/ingredients`, {
-            method: 'POST', headers: recipeHeaders(context),
-            body: JSON.stringify({ ingredient_id: ingredient.id, quantity: ingredient.quantity, unit: ingredient.unit.value }),
-          });
-          if (!isCurrentRecipeContext(context)) return;
-          if (!ingredientResponse) throw new Error('Failed to add ingredient');
-        }
-      } catch (ingredientError) {
-        if (!isCurrentRecipeContext(context)) return;
-        await fetcher(`/api/recipes/${recipeId}`, { method: 'DELETE', headers: recipeHeaders(context) }).catch(() => undefined);
-        if (!isCurrentRecipeContext(context)) return;
-        showError(t('failedToAddIngredient'));
-        throw new Error('Failed to add ingredient');
-      }
       void loadRecipes();
       setShowCreateModal(false);
       success(t('recipeCreated'));
     } catch (error) {
       if (!isCurrentRecipeContext(context)) return;
-      if (!(error instanceof Error && error.message === 'Failed to add ingredient')) showError(t('failedToCreateRecipe'));
+      showError(t(error instanceof Error && error.message === 'Failed to add ingredient' ? 'failedToAddIngredient' : 'failedToCreateRecipe'));
       throw error;
     }
   };

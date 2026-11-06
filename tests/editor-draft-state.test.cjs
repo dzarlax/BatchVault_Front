@@ -9,7 +9,7 @@ require.extensions['.ts'] = (module, filename) => {
 };
 const {
   orderEditorSnapshot, orderEditorIsDirty,
-  recipeEditorSnapshot, recipeEditorIsDirty, acknowledgeRecipeEditorSave, recipeEditorHasPendingIngredient, advanceEditorOperationScope, commitEditorWrite,
+  recipeEditorSnapshot, recipeEditorIsDirty, acknowledgeRecipeEditorSave, recipeEditorHasPendingIngredient, advanceEditorOperationScope, commitEditorWrite, createRecipeWithIngredients,
 } = require('../src/utils/editorDraftState.ts');
 const order = () => ({
   clientId: 3, status: 'new', comment: '',
@@ -186,4 +186,123 @@ test('confirmed yield PATCH remains acknowledged when cache revalidation fails',
   assert.equal(baseline.plannedYield, submitted.plannedYield);
   assert.equal(recipeEditorIsDirty(baseline, submitted), true);
   assert.equal(recipeEditorIsDirty(baseline, { ...submitted, entry: initial.entry }), false);
+});
+
+
+const deferred = () => {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+};
+const submittedRecipe = name => ({
+  headers: { Authorization: 'Bearer submitted-token', 'Content-Type': 'application/json', 'X-Workspace-ID': 'A' },
+  body: JSON.stringify({ name, planned_yield_g: 125 }),
+  ingredientBodies: [
+    JSON.stringify({ ingredient_id: 1, quantity: '2,5', unit: 'kg' }),
+    JSON.stringify({ ingredient_id: 2, quantity: '3', unit: 'g' }),
+  ],
+});
+
+for (const action of ['create', 'clone']) {
+  for (const pausedStep of ['create', 'ingredient']) {
+    test(`${action} finishes the captured composition when editor scope changes during ${pausedStep}`, async () => {
+      let scope = advanceEditorOperationScope(null, 'A:edit:1');
+      const capturedScope = scope;
+      const pause = deferred(), reachedPause = deferred();
+      const request = submittedRecipe(action === 'clone' ? 'Original (Copy)' : 'Original');
+      const expected = JSON.parse(JSON.stringify(request));
+      const writes = [], uiCallbacks = [];
+      const send = async (endpoint, options) => {
+        writes.push({ endpoint, ...options });
+        if (pausedStep === 'create' && writes.length === 1 || pausedStep === 'ingredient' && writes.length === 2) {
+          reachedPause.resolve();
+          await pause.promise;
+        }
+        return { id: 42 };
+      };
+      const submit = (async () => {
+        await createRecipeWithIngredients(request, send);
+        if (scope === capturedScope) uiCallbacks.push('close-and-success');
+      })();
+      await reachedPause.promise;
+      // A workspace switch or closing/reopening an editor invalidates UI callbacks only.
+      scope = advanceEditorOperationScope(scope, action === 'create' ? 'B:edit:7' : 'A:closed');
+      if (action === 'clone') scope = advanceEditorOperationScope(scope, 'A:edit:1');
+      request.headers['X-Workspace-ID'] = 'B';
+      request.headers.Authorization = 'Bearer replacement-token';
+      request.body = JSON.stringify({ name: 'Replacement', planned_yield_g: 999 });
+      request.ingredientBodies[1] = JSON.stringify({ ingredient_id: 99, quantity: '999', unit: 'kg' });
+      pause.resolve();
+      await submit;
+      assert.deepEqual(writes.map(write => write.endpoint), ['/api/recipes', '/api/recipes/42/ingredients', '/api/recipes/42/ingredients']);
+      assert.deepEqual(writes.map(write => write.body), [expected.body, ...expected.ingredientBodies]);
+      for (const write of writes) {
+        assert.equal(write.method, 'POST');
+        assert.deepEqual(write.headers, expected.headers);
+      }
+      assert.deepEqual(uiCallbacks, []);
+    });
+  }
+
+  test(`${action} rolls back its captured workspace after a deferred ingredient failure in a new editor`, async () => {
+    let scope = advanceEditorOperationScope(null, 'A:edit:1');
+    const capturedScope = scope;
+    const pause = deferred(), reachedFailure = deferred();
+    const request = submittedRecipe(action);
+    const expectedHeaders = { ...request.headers };
+    const writes = [], uiCallbacks = [];
+    let ingredients = 0;
+    const send = async (endpoint, options) => {
+      writes.push({ endpoint, ...options });
+      if (endpoint.endsWith('/ingredients') && ++ingredients === 2) {
+        reachedFailure.resolve();
+        await pause.promise;
+        throw new Error('Ingredient POST failed');
+      }
+      return { id: 42 };
+    };
+    let failure;
+    const submit = (async () => {
+      try {
+        await createRecipeWithIngredients(request, send);
+        if (scope === capturedScope) uiCallbacks.push('success');
+      } catch (error) {
+        failure = error;
+        if (scope === capturedScope) uiCallbacks.push('failure');
+      }
+    })();
+    await reachedFailure.promise;
+    scope = advanceEditorOperationScope(scope, 'B:edit:7');
+    request.headers['X-Workspace-ID'] = 'B';
+    request.headers.Authorization = 'Bearer replacement-token';
+    pause.resolve();
+    await submit;
+    assert.equal(failure.message, 'Failed to add ingredient');
+    assert.equal(failure.cause.message, 'Ingredient POST failed');
+    assert.deepEqual(writes.map(write => [write.method, write.endpoint]), [
+      ['POST', '/api/recipes'], ['POST', '/api/recipes/42/ingredients'],
+      ['POST', '/api/recipes/42/ingredients'], ['DELETE', '/api/recipes/42'],
+    ]);
+    for (const write of writes) assert.deepEqual(write.headers, expectedHeaders);
+    assert.deepEqual(uiCallbacks, []);
+  });
+}
+
+test('recipe creation failures never write ingredients or attempt rollback without a created ID', async () => {
+  const writes = [];
+  await assert.rejects(createRecipeWithIngredients(submittedRecipe('New'), async (endpoint, options) => {
+    writes.push({ endpoint, ...options });
+    throw new Error('Recipe POST failed');
+  }), /Recipe POST failed/);
+  assert.equal(writes.length, 1);
+});
+
+test('empty ingredient responses trigger rollback and failed rollback retains the ingredient failure', async () => {
+  const writes = [];
+  await assert.rejects(createRecipeWithIngredients(submittedRecipe('New'), async (endpoint, options) => {
+    writes.push({ endpoint, ...options });
+    if (options.method === 'DELETE') throw new Error('Rollback unavailable');
+    return endpoint === '/api/recipes' ? { id: 42 } : null;
+  }), error => error.message === 'Failed to add ingredient');
+  assert.deepEqual(writes.map(write => write.method), ['POST', 'POST', 'DELETE']);
 });
