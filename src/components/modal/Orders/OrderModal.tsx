@@ -1,16 +1,13 @@
 import React from 'react';
+import { OrderItem } from '../../../types/api';
+import { calculatedSnapshot } from '../../../utils/costing';
 import { Modal, Form, Button, FormControl } from 'react-bootstrap';
 import { FaTimes } from 'react-icons/fa';
 import useTranslation from 'next-translate/useTranslation';
 import SelectDropdown from '../../SelectDropdown';
 import { useWorkspace } from '../../../utils/workspaceContext';
 
-interface OrderItem {
-  product_id: number;
-  quantity: number;
-  price: number;
-  cost_price: number;
-}
+
 
 interface Client {
   id: number;
@@ -38,6 +35,7 @@ interface OrderModalProps {
   setStatus: (status: string) => void;
   setComment: (comment: string) => void;
   handleProductChange: (index: number, product_id: number) => void;
+  handleRefreshItemCost: (index: number) => Promise<void>;
   handleQuantityChange: (index: number, quantity: number) => void;
   handleItemChange: (index: number, field: keyof OrderItem, value: string | number) => void;
   handleRemoveItem: (index: number) => void;
@@ -59,6 +57,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
   setStatus,
   setComment,
   handleProductChange,
+  handleRefreshItemCost,
   handleQuantityChange,
   handleItemChange,
   handleRemoveItem,
@@ -122,7 +121,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       <Form.Group className="flex-1">
                         <SelectDropdown
                           options={productOptions}
-                          value={item.product_id > 0 ? productOptions.find(option => option.value === item.product_id) : null}
+                          value={item.product_id > 0 ? (productOptions.find(option => option.value === item.product_id) ?? { value: item.product_id, label: `Unavailable product #${item.product_id}` }) : null}
                           onChange={option => handleProductChange(index, option?.value || 0)}
                           placeholder={t('selectProduct')}
                           label={t('product')}
@@ -161,11 +160,14 @@ const OrderModal: React.FC<OrderModalProps> = ({
                           type="number"
                           min="0"
                           step="0.01"
-                          readOnly
-                          value={item.cost_price}
+                          readOnly={calculatedSnapshot(item.cost_snapshot) || item.cost_source === 'recipe' || item.cost_source === 'assortment'}
+                          value={Number.isFinite(item.cost_price) ? item.cost_price : ''}
+                          onChange={event => handleItemChange(index, 'cost_price', event.target.value.trim() ? Number(event.target.value) : Number.NaN)}
                         />
                       </Form.Group>
                     </div>
+                    <p className="small text-secondary mb-1">{item.id && !item.cost_source ? 'Saved order cost' : 'Current estimate for review'} · {item.cost_snapshot?.source || item.cost_source || 'manual'}</p>
+                    {!item.cost_snapshot && (item.cost_source === 'recipe' || item.cost_source === 'assortment') && <Button size="sm" variant="outline-secondary" onClick={() => void handleRefreshItemCost(index)}>Refresh estimated cost</Button>}
                   </div>
                 </div>
               ))}
@@ -211,7 +213,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
         <Button
           variant="primary"
           onClick={onSave}
-          disabled={items.length === 0 || !clientId}
+          disabled={items.length === 0 || !clientId || items.some(item => !item.product_id || !Number.isFinite(item.cost_price) || item.cost_price < 0)}
         >
           {t('saveChanges')}
         </Button>

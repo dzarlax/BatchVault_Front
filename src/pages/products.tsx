@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import ProductCostingEditor from '../components/products/ProductCostingEditor';
+import { CostingDraft, emptyCostingDraft, costingPayload, decimalInput, validCostingDraft } from '../utils/costing';
 import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
 import { useRouter } from 'next/router';
@@ -24,7 +26,7 @@ import { ClearFiltersButton, FilterBar } from '../components/filters/FilterBar';
 const Products = () => {
   const { t } = useTranslation('common');
   const { auth } = useAuth();
-  const { selectedWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
   const { success, error: showError } = useNotification();
   const { data: products, mutate: mutateProducts, error: productsError } = useSWR<Product[]>(
     workspaceKey('/api/products', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
@@ -44,6 +46,7 @@ const Products = () => {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
+  const [costingDraft, setCostingDraft] = useState<CostingDraft>(emptyCostingDraft);
   const [image, setImage] = useState('');
   const [recipeIds, setRecipeIds] = useState<number[]>([]);
   const [selectedRecipes, setSelectedRecipes] = useState<{ value: number; label: string }[]>([]);
@@ -55,11 +58,18 @@ const Products = () => {
   const [selectedPackage, setSelectedPackage] = useState<SingleValue<{ value: number; label: string }> | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<SingleValue<{ value: number; label: string }> | null>(null);
 
+  useEffect(() => {
+    setShowProductModal(false); setShowPackageModal(false); setEditingProduct(null);
+    setName(''); setDescription(''); setPrice(''); setCost(''); setImage(''); setPackageId(null);
+    setRecipeIds([]); setSelectedRecipes([]); setCostingDraft(emptyCostingDraft());
+    setSelectedProduct(null); setSelectedPackage(null); setSelectedRecipe(null);
+  }, [selectedWorkspaceId]);
+
   const filteredProducts = useMemo(() => {
     let filtered = products || [];
     if (selectedRecipe) {
       filtered = filtered.filter(product =>
-        (product.options || []).some(option => option.recipe_id === selectedRecipe.value)
+        (product.options || []).some(option => option.recipe_id === selectedRecipe.value) || product.cost_recipe_id === selectedRecipe.value || (product.components || []).some(row => row.recipe_id === selectedRecipe.value)
       );
     }
 
@@ -87,6 +97,9 @@ const Products = () => {
     setDescription(product.description || '');
     setPrice(product.price.toString());
     setCost(product.cost.toString());
+    setCostingDraft({ cost_mode: product.cost_mode || 'manual', cost_recipe_id: product.cost_recipe_id ?? null,
+      components: (product.components || []).map(row => ({ recipe_id: row.recipe_id, quantity_g: String(row.quantity_g) })),
+      reviewed: product.cost_mode === 'recipe' || product.cost_mode === 'assortment' });
     setImage(product.image || product.image_url || '');
 
     const selected = (product.options || []).map(option => {
@@ -106,6 +119,7 @@ const Products = () => {
     setDescription('');
     setPrice('');
     setCost('');
+    setCostingDraft(emptyCostingDraft());
     setImage('');
     setRecipeIds([]);
     setSelectedRecipes([]);
@@ -126,9 +140,10 @@ const Products = () => {
       if (!name) errors.push(t('productNameRequired'));
       if (!description) errors.push(t('productDescriptionRequired'));
       if (!price || parseFloat(price) <= 0) errors.push(t('validPriceRequired'));
-      if (!cost || parseFloat(cost) <= 0) errors.push(t('validCostRequired'));
+      if (costingDraft.cost_mode === 'manual' && (decimalInput(cost) == null)) errors.push('Enter a non-negative manual cost.');
+      if (!validCostingDraft(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)) errors.push('Review the content-only recipes, select a source and make component grams match the package.');
       if (!packageId) errors.push(t('packageRequired'));
-      if (selectedRecipes.length === 0) errors.push(t('atLeastOneRecipeRequired'));
+
       
       if (errors.length > 0) {
         alert(errors.join('\n'));
@@ -136,7 +151,7 @@ const Products = () => {
       }
   
       const parsedPrice = parseFloat(price);
-      const parsedCost = parseFloat(cost);
+      const parsedCost = decimalInput(cost);
   
       // Only validate the image URL if it's not empty
       if (image.trim()) {
@@ -148,14 +163,15 @@ const Products = () => {
         }
       }
   
-      // Формируем массив recipeIds на основе selectedRecipes
+      // Build legacy recipe links from the explicit selection.
       const recipeIds = selectedRecipes.map(recipe => recipe.value);
   
       const product = {
         name,
         description,
         price: parsedPrice,
-        cost: parsedCost,
+        ...(costingDraft.cost_mode === 'manual' ? { cost: parsedCost } : {}),
+        ...costingPayload(costingDraft),
         image: image || null,
         recipe_ids: recipeIds,
         package_id: packageId,
@@ -186,7 +202,7 @@ const Products = () => {
       handleCloseProductModal();
       success(editingProduct ? t('productUpdated') : t('productCreated'));
     } catch (error) {
-      showError(t('failedToSaveProduct'));
+      showError(error instanceof Error ? error.message : t('failedToSaveProduct'));
     }
   };
 
@@ -229,17 +245,17 @@ const Products = () => {
   };
 
   const recipeOptions = recipes?.map(recipe => ({ value: recipe.id, label: recipe.name })) || [];
-  const packageOptions = packages?.map(pkg => ({ value: pkg.id, label: pkg.name })) || [];
+  const packageOptions = packages?.map(pkg => ({ value: pkg.id, label: `${pkg.name}${pkg.net_weight_g != null ? ` · ${pkg.net_weight_g} g net` : ' · weight unknown'}` })) || [];
   const productOptions = products?.map(product => ({ value: product.id, label: product.name })) || [];
   const hasActiveFilters = !!(selectedRecipe || selectedPackage || selectedProduct);
 
-  // Проверяем наличие ошибок
+  // Check request errors.
   const hasError = productsError || recipesError || packagesError;
   
-  // Проверяем загрузку данных
+  // Check loading state.
   const isLoading = !products || !recipes || !packages;
 
-  // Если есть ошибка, показываем компонент ошибки
+  // Show a recoverable loading error.
   if (hasError) {
     return (
       <ErrorState 
@@ -395,6 +411,11 @@ const Products = () => {
         setPrice={setPrice}
         cost={cost}
         setCost={setCost}
+        calculatedCost={costingDraft.cost_mode !== 'manual'}
+        costingValid={validCostingDraft(costingDraft, packages?.find(pkg => pkg.id === packageId)?.net_weight_g)}
+        costingControls={<ProductCostingEditor draft={costingDraft} onChange={setCostingDraft} recipes={recipes || []}
+          selectedPackage={packages?.find(pkg => pkg.id === packageId)} packageId={packageId} workspaceId={selectedWorkspaceId}
+          linkedRecipes={selectedRecipes.map(row => row.value)} currency={selectedCurrency || ''} show={showProductModal} />}
         image={image}
         setImage={setImage}
         selectedRecipes={selectedRecipes}

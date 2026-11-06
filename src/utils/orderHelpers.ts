@@ -1,7 +1,8 @@
 // Helper functions for order calculations and formatting
 // Pure functions that can be easily tested
 
-import { OrderItem } from '../types/api';
+import { OrderItem, Product } from '../types/api';
+import { effectiveProductCost, costIssues } from './costing';
 
 /**
  * Calculate total price for order items
@@ -28,13 +29,14 @@ export const calculateProfit = (items: OrderItem[]): number => {
  * Group order items by product_id and sum quantities
  */
 export const groupOrderItems = (items: OrderItem[]): OrderItem[] => {
-  const itemMap: { [key: number]: OrderItem } = {};
+  const itemMap: { [key: string]: OrderItem } = {};
 
   items.forEach((item) => {
-    if (!itemMap[item.product_id]) {
-      itemMap[item.product_id] = { ...item, quantity: 0 };
+    const key = item.id ?? `${item.product_id}:${item.price}:${item.cost_price}`;
+    if (!itemMap[key]) {
+      itemMap[key] = { ...item, quantity: 0 };
     }
-    itemMap[item.product_id].quantity += item.quantity;
+    itemMap[key].quantity += item.quantity;
   });
 
   return Object.values(itemMap);
@@ -63,13 +65,14 @@ export const createEmptyOrderItem = (): OrderItem => {
  * Create order item from product
  */
 export const createOrderItemFromProduct = (
-  product: { id: number; price: number; cost: number }
+  product: Pick<Product, 'id' | 'price' | 'cost' | 'cost_estimate' | 'cost_mode'>
 ): OrderItem => {
   return {
     product_id: product.id,
     quantity: 1,
     price: product.price,
-    cost_price: product.cost,
+    cost_price: effectiveProductCost(product) ?? Number.NaN,
+    cost_source: product.cost_mode || 'manual',
   };
 };
 
@@ -101,4 +104,18 @@ export const removeOrderItem = (items: OrderItem[], index: number): OrderItem[] 
  */
 export const addOrderItem = (items: OrderItem[]): OrderItem[] => {
   return [...items, createEmptyOrderItem()];
+};
+
+
+// A quote refresh deliberately returns only costing fields, never order quantities or sale prices.
+export const refreshOrderItemEstimate = async (
+  item: OrderItem,
+  loadProduct: (productId: number) => Promise<Product>
+): Promise<Pick<OrderItem, 'cost_price' | 'cost_source' | 'cost_snapshot'>> => {
+  if (item.cost_snapshot) throw new Error('Saved order cost cannot be refreshed.');
+  const product = await loadProduct(item.product_id);
+  if (product.id !== item.product_id) throw new Error('The refreshed product does not match this order item.');
+  const cost = effectiveProductCost(product);
+  if (cost == null || !Number.isFinite(cost) || cost < 0) throw new Error(costIssues(product.cost_estimate));
+  return { cost_price: cost, cost_source: product.cost_estimate?.source || product.cost_mode || 'manual', cost_snapshot: undefined };
 };

@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import fetcher from '../../../utils/fetcher';
+import { useWorkspace } from '../../../utils/workspaceContext';
+import { decimalInput, invalidateCosting } from '../../../utils/costing';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { FaExclamationTriangle, FaLayerGroup, FaPlus, FaTrash } from 'react-icons/fa';
 import { WorkspaceIngredient } from '../../../types/api';
@@ -43,7 +46,8 @@ type RecipeBuilderModalProps = {
   workspaceIngredients?: WorkspaceIngredient[];
   t: (key: string) => string;
   recipe?: any;
-  onCreateRecipe?: (name: string, ingredients: DraftIngredient[]) => Promise<void>;
+  onCreateRecipe?: (name: string, ingredients: DraftIngredient[], plannedYield?: number | null) => Promise<void>;
+  onYieldSaved?: (recipe: any) => void;
   onAddIngredientToRecipe?: (ingredient: { ingredient_id: number; quantity: string; unit: string }) => Promise<void>;
   onDeleteIngredientFromRecipe?: (ingredientId: number) => Promise<void>;
   onDeleteRecipe?: () => void;
@@ -65,7 +69,7 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   workspaceIngredients = [],
   t,
   recipe,
-  onCreateRecipe,
+  onCreateRecipe, onYieldSaved,
   onAddIngredientToRecipe,
   onDeleteIngredientFromRecipe,
   onDeleteRecipe,
@@ -73,6 +77,19 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
 }) => {
   const isEdit = mode === 'edit';
   const [recipeName, setRecipeName] = useState('');
+  const [plannedYield, setPlannedYield] = useState('');
+  const { selectedWorkspaceId } = useWorkspace();
+  useEffect(() => { setPlannedYield(recipe?.planned_yield_g == null ? '' : String(recipe.planned_yield_g)); }, [show, recipe?.id, recipe?.planned_yield_g, selectedWorkspaceId]);
+  const saveYield = async () => {
+    const value = plannedYield.trim() ? decimalInput(plannedYield) : null;
+    if (plannedYield.trim() && (value == null || value <= 0)) { setFormError('Planned yield must be positive grams.'); return; }
+    setIsSaving(true); setFormError('');
+    try {
+      const updated = await fetcher(`/api/recipes/${recipe.id}`, { method: 'PATCH', headers: { 'X-Workspace-ID': selectedWorkspaceId }, body: JSON.stringify({ planned_yield_g: value }) });
+      onYieldSaved?.(updated); await invalidateCosting(selectedWorkspaceId);
+    } catch (err) { setFormError(err instanceof Error ? err.message : 'Failed to save planned yield'); }
+    finally { setIsSaving(false); }
+  };
   const [draftIngredients, setDraftIngredients] = useState<DraftIngredient[]>([]);
   const [ingredientId, setIngredientId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -275,7 +292,9 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
 
     setIsSaving(true);
     try {
-      await onCreateRecipe(recipeName.trim(), draftIngredients);
+      const yieldValue = plannedYield.trim() ? decimalInput(plannedYield) : null;
+      if (plannedYield.trim() && (yieldValue == null || yieldValue <= 0)) { setFormError('Planned yield must be positive grams.'); return; }
+      await onCreateRecipe(recipeName.trim(), draftIngredients, yieldValue);
     } catch (error) {
       setFormError(error instanceof Error && error.message === 'Failed to add ingredient'
         ? t('failedToAddIngredient')
@@ -333,6 +352,13 @@ const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
         </Modal.Header>
 
         <Modal.Body>
+          <section className="recipe-builder-section mb-3">
+            <Form.Group controlId="plannedFinishedYield"><Form.Label>Planned finished yield (g)</Form.Label>
+              <Form.Control inputMode="decimal" value={plannedYield} onChange={event => setPlannedYield(event.target.value)} placeholder="Unknown" />
+              <Form.Text>Finished content after cooking/drying from exactly the listed ingredient quantities. Up to three decimal places; blank means unknown.</Form.Text>
+            </Form.Group>
+            {isEdit && <Button type="button" size="sm" className="mt-2" disabled={isSaving} onClick={saveYield}>Save planned yield</Button>}
+          </section>
           <div className="recipe-builder-layout">
             <div className="recipe-builder-main">
               <section className="recipe-builder-section">

@@ -11,7 +11,9 @@
     "start": "node scripts/run-with-env.mjs NODE_ENV=production -- node server.js",
     "start:next": "next start",
     "lint": "next lint",
-    "depcheck": "node --loader ts-node/esm ./node_modules/.bin/depcheck"
+    "depcheck": "node --loader ts-node/esm ./node_modules/.bin/depcheck",
+    "test:costing": "node --test tests/order-cost-refresh.test.cjs",
+    "test:costing:browser": "node --test tests/order-cost-refresh.browser.cjs"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-geocoder": "^5.0.3",

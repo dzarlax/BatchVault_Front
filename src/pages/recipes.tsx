@@ -1,3 +1,4 @@
+import { invalidateCosting } from '../utils/costing';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
@@ -178,7 +179,7 @@ const Recipes: React.FC = () => {
         'Authorization': `Bearer ${auth.token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name: `${editingRecipe.name} (Copy)`, ingredients: [] }),
+      body: JSON.stringify({ name: `${editingRecipe.name} (Copy)`, planned_yield_g: editingRecipe.planned_yield_g ?? null }),
     });
 
     if (response) {
@@ -250,6 +251,7 @@ const Recipes: React.FC = () => {
     });
 
     await refreshEditingRecipe(editingRecipe.id);
+    await invalidateCosting(selectedWorkspaceId);
   };
 
   const deleteIngredientFromEditingRecipe = async (ingredientId: number) => {
@@ -269,9 +271,10 @@ const Recipes: React.FC = () => {
     });
 
     await refreshEditingRecipe(editingRecipe.id);
+    await invalidateCosting(selectedWorkspaceId);
   };
 
-  const handleCreateRecipe = async (name: string, ingredients: any[]) => {
+  const handleCreateRecipe = async (name: string, ingredients: any[], plannedYield?: number | null) => {
     try {
       if (!auth.isAuthenticated || !auth.token) {
         router.push('/auth/signin');
@@ -284,7 +287,7 @@ const Recipes: React.FC = () => {
           'Authorization': `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, planned_yield_g: plannedYield ?? null }),
       });
 
       if (response) {
@@ -358,7 +361,7 @@ const Recipes: React.FC = () => {
 
   const isMissingCost = (value: any) => {
     const numericValue = typeof value === 'number' ? value : parseFloat(value);
-    return !Number.isFinite(numericValue) || numericValue <= 0;
+    return !Number.isFinite(numericValue) || numericValue < 0;
   };
 
   const formatCost = (value: any) => {
@@ -371,7 +374,7 @@ const Recipes: React.FC = () => {
   };
 
   const getMissingCostCount = (recipe: any) =>
-    getRecipeIngredients(recipe).filter((ingredient: any) => isMissingCost(ingredient.calculated_cost)).length;
+    getRecipeIngredients(recipe).filter((ingredient: any) => ingredient.cost_status === 'incomplete' || isMissingCost(ingredient.calculated_cost)).length;
 
   const renderRecipeDetails = (recipe: any, variant: 'desktop' | 'mobile') => {
     const recipeIngredients = getRecipeIngredients(recipe);
@@ -393,11 +396,15 @@ const Recipes: React.FC = () => {
             </div>
           </div>
           <div className="recipe-detail-cost">
-            <span className="recipe-cost-label">{t('totalCost')}</span>
+            <span className="recipe-cost-label">{recipe.cost_estimate?.status === 'complete' ? 'Ingredient subtotal' : 'Known ingredient subtotal'}</span>
             <strong>{formatCost(recipe.total_cost)}</strong>
           </div>
         </div>
 
+        <div className="mb-3 small">
+          <p className="mb-1">Planned finished yield: <strong>{recipe.planned_yield_g ?? 'Unknown'} g</strong></p>
+          {recipe.cost_estimate?.status === 'complete' && recipe.cost_estimate.cost_per_gram != null ? <p>Finished content: {(recipe.cost_estimate.cost_per_gram * 1000).toFixed(2)} {selectedCurrency || ''} / kg</p> : <div className="alert alert-warning py-2">Incomplete content calculation: {recipe.cost_estimate?.issues?.map((issue: any) => issue.message).join('; ') || 'Cost source information is unavailable'}</div>}
+        </div>
         {recipeIngredients.length > 0 ? (
           <div className="recipe-detail-table">
             <div className="recipe-detail-table-head">
@@ -409,8 +416,8 @@ const Recipes: React.FC = () => {
               <div key={ri.id || ri.ingredient_id} className="recipe-detail-row">
                 <span className="recipe-detail-ingredient">{ri.ingredient?.name || t('unknown')}</span>
                 <span className="recipe-detail-quantity">{ri.quantity} {ri.unit}</span>
-                <span className={isMissingCost(ri.calculated_cost) ? 'recipe-detail-cost-missing' : ''}>
-                  {formatCost(ri.calculated_cost)}
+                <span className={ri.cost_status === 'incomplete' || isMissingCost(ri.calculated_cost) ? 'recipe-detail-cost-missing' : ''}>
+                  {ri.cost_status === 'incomplete' ? 'Unavailable' : formatCost(ri.calculated_cost)}
                 </span>
               </div>
             ))}
@@ -554,7 +561,7 @@ const Recipes: React.FC = () => {
                     aria-pressed={isSelected}
                   >
                     <span className="recipe-list-name">{recipe.name}</span>
-                    <span className="recipe-list-cost">{formatCost(recipe.total_cost)}</span>
+                    <span className="recipe-list-cost">{recipe.cost_estimate?.status === 'complete' ? 'Ingredient subtotal: ' : 'Known subtotal: '}{formatCost(recipe.total_cost)}</span>
                     <span className="recipe-list-meta">
                       {formatCount(t, recipeIngredients.length, 'ingredient')}
                       {missingCostCount > 0 && ` · ${formatCount(t, missingCostCount, 'missingCost')}`}
@@ -579,6 +586,7 @@ const Recipes: React.FC = () => {
         t={t}
         onDeleteRecipe={deleteRecipe}
         onCloneRecipe={cloneRecipe}
+        onYieldSaved={updated => { setEditingRecipe(updated); }}
         onAddIngredientToRecipe={addIngredientToEditingRecipe}
         onDeleteIngredientFromRecipe={deleteIngredientFromEditingRecipe}
       />

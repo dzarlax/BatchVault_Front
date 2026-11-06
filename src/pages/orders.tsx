@@ -1,3 +1,5 @@
+import { refreshOrderItemEstimate } from '../utils/orderHelpers';
+import { effectiveProductCost, costIssues, invalidateCosting } from '../utils/costing';
 import React, { useState, useMemo, useCallback } from "react";
 import useSWR from "swr";
 import fetcher from "../utils/fetcher";
@@ -88,6 +90,7 @@ const Orders = () => {
     setItems(
       order.items
         ? order.items.map((item) => ({
+            id: item.id, cost_snapshot: item.cost_snapshot,
             product_id: item.product_id,
             quantity: item.quantity,
             price: item.price,
@@ -126,6 +129,8 @@ const Orders = () => {
           },
           body: JSON.stringify(order),
         });
+        try { await fetcher(`/api/orders/${editingOrder.id}`); }
+        catch (readError) { handleCloseOrderModal(); showError('Order saved, but details could not be refreshed. Retry the read, not the save.'); mutateOrders(); return; }
         mutateOrders();
       } else {
         await fetcher("/api/orders", {
@@ -142,7 +147,8 @@ const Orders = () => {
       handleCloseOrderModal();
       success(editingOrder ? t('orderUpdated') : t('orderCreated'));
     } catch (error) {
-      showError(t('failedToSaveOrder'));
+      await invalidateCosting(selectedWorkspaceId);
+      showError(error instanceof Error ? error.message : t('failedToSaveOrder'));
     }
   };
 
@@ -170,7 +176,8 @@ const Orders = () => {
       setShowCreateOrderModal(false);
       success(t('orderCreated'));
     } catch (error) {
-      showError(t('failedToCreateOrder'));
+      await invalidateCosting(selectedWorkspaceId);
+      showError(error instanceof Error ? error.message : t('failedToCreateOrder'));
     }
   };
 
@@ -192,8 +199,33 @@ const Orders = () => {
     const product = products.find((p) => p.id === product_id);
     if (product) {
       const updatedItems = [...items];
-      updatedItems[index] = { ...updatedItems[index], product_id, price: product.price, cost_price: product.cost };
+      const original = editingOrder?.items.find(row => row.id === items[index].id);
+      if (original && original.product_id === product_id) {
+        updatedItems[index] = { id: original.id, product_id: original.product_id, quantity: updatedItems[index].quantity, price: original.price, cost_price: original.cost_price, cost_snapshot: original.cost_snapshot };
+        setItems(updatedItems);
+        return;
+      }
+      const cost = effectiveProductCost(product);
+      if (cost == null) { showError(costIssues(product.cost_estimate)); return; }
+      updatedItems[index] = { ...updatedItems[index], product_id, price: product.price, cost_price: cost, cost_snapshot: undefined, cost_source: product.cost_mode || 'manual' };
       setItems(updatedItems);
+    }
+  };
+
+  const activeCostWorkspace = React.useRef(selectedWorkspaceId);
+  activeCostWorkspace.current = selectedWorkspaceId;
+  const handleRefreshItemCost = async (index: number) => {
+    const item = items[index];
+    if (!item || item.cost_snapshot || !selectedWorkspaceId) return;
+    const workspace = selectedWorkspaceId;
+    try {
+      const patch = await refreshOrderItemEstimate(item, productId => fetcher(`/api/products/${productId}`, { headers: { 'X-Workspace-ID': workspace } }));
+      if (activeCostWorkspace.current !== workspace) return;
+      setItems(current => current.map((row, i) =>
+        i === index && row.id === item.id && row.product_id === item.product_id && !row.cost_snapshot ? { ...row, ...patch } : row
+      ));
+    } catch (error) {
+      if (activeCostWorkspace.current === workspace) showError(error instanceof Error ? error.message : 'Unable to refresh estimated cost');
     }
   };
 
@@ -503,6 +535,7 @@ const Orders = () => {
         setStatus={setStatus}
         setComment={setComment}
         handleProductChange={handleProductChange}
+        handleRefreshItemCost={handleRefreshItemCost}
         handleQuantityChange={handleQuantityChange}
         handleItemChange={handleItemChange}
         handleRemoveItem={handleRemoveItem}
