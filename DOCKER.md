@@ -16,7 +16,7 @@ The application uses **multi-stage Docker build** with **runtime configuration**
 ### 1. Pull the Image
 
 ```bash
-docker pull ghcr.io/dzarlax/jerky-vault-frontend:latest
+docker pull ghcr.io/dzarlax/batchvault-front:latest
 ```
 
 ### 2. Create docker-compose.yaml
@@ -24,7 +24,7 @@ docker pull ghcr.io/dzarlax/jerky-vault-frontend:latest
 ```yaml
 services:
   jerky_vault_frontend:
-    image: ghcr.io/dzarlax/jerky-vault-frontend:latest
+    image: ghcr.io/dzarlax/batchvault-front:latest
     ports:
       - "3000:3000"
     environment:
@@ -172,7 +172,7 @@ const mapboxToken = getMapboxToken();
 If you want to build the image yourself instead of pulling from GHCR:
 
 ```bash
-docker build -t jerky-vault-frontend:local .
+docker build -t batchvault-front:local .
 ```
 
 With custom build arguments:
@@ -181,7 +181,7 @@ With custom build arguments:
 docker build \
   --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
   --build-arg MAPBOX_ACCESS_TOKEN=your_token \
-  -t jerky-vault-frontend:local .
+  -t batchvault-front:local .
 ```
 
 ## Development vs Production
