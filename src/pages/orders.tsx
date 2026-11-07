@@ -19,7 +19,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../utils/authContext';
 import { useNotification } from '../hooks/useNotification';
 import { Order, OrderItem, Client, Product, ORDER_STATUSES } from '../types/api';
-import { FaSync, FaPencilAlt, FaTrash, FaPlus, FaShoppingCart } from "react-icons/fa";
+import { FaSync, FaPencilAlt, FaTrash, FaPlus, FaShoppingCart, FaFire } from "react-icons/fa";
 import { useWorkspace } from '../utils/workspaceContext';
 import { workspaceFetcher, workspaceKey } from '../utils/workspaceSWR';
 import { ClearFiltersButton, FilterBar } from '../components/filters/FilterBar';
@@ -27,7 +27,7 @@ import { ClearFiltersButton, FilterBar } from '../components/filters/FilterBar';
 const Orders = () => {
   const { t } = useTranslation("common");
   const { auth } = useAuth();
-  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady } = useWorkspace();
+  const { selectedWorkspaceId, selectedCurrency, isWorkspaceReady, selectedWorkspace } = useWorkspace();
   const { success, error: showError } = useNotification();
   const router = useRouter();
 
@@ -384,6 +384,9 @@ const Orders = () => {
             </p>
           )}
         </div>
+        {selectedWorkspace?.capabilities?.cooking_v1 === true && <Button className="btn btn-outline-primary me-2" onClick={() => void router.push('/cooking')}>
+          <FaFire className="me-2" aria-hidden="true" />{t('cookingTitle')}
+        </Button>}
         <Button
           className="btn btn-primary"
           disabled={referencesUnavailable}

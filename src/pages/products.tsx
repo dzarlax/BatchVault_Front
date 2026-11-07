@@ -15,6 +15,8 @@ import ProductModal from '../components/modal/Products/ProductModal';
 import PackageModal from '../components/modal/Products/PackageModal';
 import { FaPlus, FaTag } from 'react-icons/fa';
 import ProductCard from '../components/ProductCard';
+import { cookingApiFor, cookingOperationScope } from '../utils/cooking';
+import type { CookingStock } from '../types/cooking';
 import ProductCardSkeleton from '../components/skeletons/ProductCardSkeleton';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -43,6 +45,23 @@ const Products = () => {
     workspaceKey('/api/packages', selectedWorkspaceId, auth.isAuthenticated && isWorkspaceReady),
     workspaceFetcher
   );
+  const cookingEnabled = selectedWorkspace?.capabilities?.cooking_v1 === true;
+  const { data: finishedStock, error: finishedStockError, mutate: refreshFinishedStock } = useSWR<CookingStock>(
+    auth.isAuthenticated && isWorkspaceReady && cookingEnabled ? ['cooking-product-stock', cookingOperationScope(selectedWorkspaceId)] : null,
+    () => cookingApiFor(selectedWorkspaceId).stock()
+  );
+  const packagedStock = useMemo(() => {
+    const balances = new Map<number, { total: number; reserved: number; available: number }>();
+    for (const lot of finishedStock?.lots || []) {
+      if (lot.kind !== 'packaged' || !lot.product_id) continue;
+      const current = balances.get(lot.product_id) || { total: 0, reserved: 0, available: 0 };
+      current.total += Number(lot.quantity);
+      current.reserved += Number(lot.reserved);
+      current.available += Number(lot.available);
+      balances.set(lot.product_id, current);
+    }
+    return balances;
+  }, [finishedStock]);
   const router = useRouter();
   const modern = selectedWorkspace?.capabilities?.product_types_v1 === true;
   const [busy, setBusy] = useState(false);
@@ -378,6 +397,9 @@ const Products = () => {
 
       {hasError && <ErrorState message={t('failedToLoadProducts')} compact={Boolean(products)} onRetry={() => { void Promise.allSettled([mutateProducts(), mutateRecipes(), mutatePackages()]); }} />}
 
+      {cookingEnabled && finishedStockError && <ErrorState message={t('cookingLoadError')} compact onRetry={() => void refreshFinishedStock()} />}
+      {cookingEnabled && finishedStock && !finishedStockError && finishedStock.lots.length === 0 && <Button variant="link" onClick={() => void router.push('/cooking')}>{t('cookingStockEmpty')}</Button>}
+
       {/* Products Grid */}
       {!products && hasError ? null : isLoading ? (
         <div className="products-grid">
@@ -401,6 +423,7 @@ const Products = () => {
                 recipes={recipes || []}
                 packages={packages || []}
                 editDisabled={!recipes || !packages || Boolean(recipesError || packagesError)}
+                stock={cookingEnabled && finishedStock && !finishedStockError ? packagedStock.get(product.id) || { total: 0, reserved: 0, available: 0 } : undefined}
                 onEdit={handleEditProduct}
               />
             </div>
