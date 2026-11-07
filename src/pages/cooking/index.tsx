@@ -52,6 +52,8 @@ const CookingHome = () => {
   const [stockItemType, setStockItemType] = useState<'recipe' | 'product'>('recipe');
   const [stockQuantity, setStockQuantity] = useState('');
   const [stockReason, setStockReason] = useState('');
+  const previewFingerprint = useRef<string | null>(null);
+  const currentPreviewFingerprint = useRef('');
   const unfinishedOrders = useMemo(() => (orders || []).filter(order => !['finished', 'canceled'].includes(order.status)), [orders]);
   const recipeOptions = (recipes || []).map(recipe => ({ value: recipe.id, label: recipe.name }));
   const selectedStockLot = stock?.lots.find(lot => lot.id === stockLot);
@@ -86,12 +88,18 @@ const CookingHome = () => {
     ...(Object.keys(baseSelections).length ? { base_selections: baseSelections } : {}),
     ...(acknowledged.length ? { acknowledged_run_ids: acknowledged } : {}),
   };
+  const inputFingerprint = JSON.stringify([contextKey, input, stock?.version]);
+  currentPreviewFingerprint.current = inputFingerprint;
+  const previewIsCurrent = Boolean(preview && previewFingerprint.current === inputFingerprint && !previewDirty);
 
   const runPreview = async () => {
     const requestContext = contextKey;
+    const requestFingerprint = inputFingerprint;
+    const requestInput = input;
+    setPreviewDirty(true);
     setBusy(true); setError('');
-    try { const result = await api.plan(input); if (activeContext.current === requestContext) { setPreview(result); setPreviewDirty(false); } }
-    catch (cause) { if (activeContext.current === requestContext) setError(operationErrorMessage(cause)); }
+    try { const result = await api.plan(requestInput); if (activeContext.current === requestContext && currentPreviewFingerprint.current === requestFingerprint) { previewFingerprint.current = requestFingerprint; setPreview(result); setPreviewDirty(false); } }
+    catch (cause) { if (activeContext.current === requestContext && currentPreviewFingerprint.current === requestFingerprint) setError(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
 
@@ -118,7 +126,7 @@ const CookingHome = () => {
 
   const createRun = async () => {
     if (!canStartFreshMutation()) return;
-    if (!preview || previewDirty) return;
+    if (!previewIsCurrent) return;
     const requestContext = contextKey;
     const operationScope = cookingOperationScope(selectedWorkspaceId);
     setBusy(true); setError('');
@@ -203,9 +211,9 @@ const CookingHome = () => {
       <div className="cooking-extra-row"><div className="cooking-extra-copy"><strong>{t('cookingExtra')}</strong><span className="text-tertiary">{t('cookingExtraHint')}</span></div><div className="cooking-extra-controls"><SelectDropdown isDisabled={pendingCreate} options={recipeOptions} value={recipeOptions.find(option => option.value === extraRecipe) || null} onChange={(option: {value:number}|null) => { setPreview(null); setExtraRecipe(option?.value ?? null); }} placeholder={t('chooseRecipe')} aria-label={t('chooseRecipe')} /><Form.Control disabled={pendingCreate} inputMode="decimal" value={extraGrams} onChange={event => { setPreview(null); setExtraGrams(event.target.value); }} placeholder={t('cookingFinishedGrams')} aria-label={t('cookingFinishedGrams')} /></div></div>
       {preview?.active_runs?.length > 0 && <Alert variant="warning"><strong>{t('cookingActiveRuns')}</strong>{preview.active_runs.map(run => <Form.Check key={run.id} label={`${run.title} (#${run.id})`} disabled={pendingCreate} checked={acknowledged.includes(run.id)} onChange={event => { setPreview(null); setAcknowledged(current => event.target.checked ? [...current, run.id] : current.filter(id => id !== run.id)); }} />)}</Alert>}
       <div className="cooking-actions"><Button variant="outline-primary" onClick={() => void runPreview()} disabled={busy || pendingCreate || Boolean(pendingStockAction) || (!selectedOrders.length && !(extraRecipe && parseDecimalInput(extraGrams)))}><FaSync className="me-2" />{t('cookingPreview')}</Button></div>
-      {preview && <div className="cooking-preview" aria-live="polite"><h3>{t('cookingSuggestedTargets')}</h3>{previewDirty && <Alert variant="warning" className="py-2">{t('cookingPreviewStale')}</Alert>}<div className="cooking-flavor-grid">{preview.plan.flavors.map(flavor => { const baseRows = flavor.recipe_snapshot.ingredients.filter(row => row.type.toLowerCase() === 'base' && ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms'].includes(row.unit.trim().toLowerCase())); const options = baseRows.map(row => ({value: row.recipe_ingredient_id, label: `${row.name} · ${row.quantity} ${row.unit}`})); const needsExplicit = hasBaseSelectionIssue(flavor.issues) || options.length > 1; const selectedBase = baseSelections[String(flavor.recipe_id)] || (!needsExplicit ? flavor.base_recipe_ingredient_id : 0); return <article className="cooking-flavor-card" key={flavor.recipe_id}><span className="text-tertiary">{t('recipe')}</span><strong>{flavor.name}</strong><span>{t('cookingTarget')}: <b>{displayGrams(flavor.target_finished_g)} g</b></span><span>{t('cookingSuggestedMeat')}: <b>{displayGrams(flavor.suggested_meat_g)} g</b></span>{flavor.issues.map(issue => <small className="text-warning" key={issue.code}>{cookingIssueLabel(issue.code, t)}</small>)}{options.length > 0 && <Form.Group className="mt-2"><SelectDropdown isDisabled={pendingCreate} label={t('cookingBaseIngredient')} options={options} value={options.find(option => option.value === selectedBase) || null} onChange={(option: {value:number}|null) => { setPreviewDirty(true); setBaseSelections(current => ({...current, [String(flavor.recipe_id)]: option?.value || 0})); }} /></Form.Group>}{!options.length && <small className="text-warning">{t('cookingBaseNotAvailable')}</small>}</article>; })}</div>
+      {preview && <div className="cooking-preview" aria-live="polite"><h3>{t('cookingSuggestedTargets')}</h3>{(previewDirty || !previewIsCurrent) && <Alert variant="warning" className="py-2">{t('cookingPreviewStale')}</Alert>}<div className="cooking-flavor-grid">{preview.plan.flavors.map(flavor => { const baseRows = flavor.recipe_snapshot.ingredients.filter(row => row.type.toLowerCase() === 'base' && ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms'].includes(row.unit.trim().toLowerCase())); const options = baseRows.map(row => ({value: row.recipe_ingredient_id, label: `${row.name} · ${row.quantity} ${row.unit}`})); const needsExplicit = hasBaseSelectionIssue(flavor.issues) || options.length > 1; const selectedBase = baseSelections[String(flavor.recipe_id)] || (!needsExplicit ? flavor.base_recipe_ingredient_id : 0); return <article className="cooking-flavor-card" key={flavor.recipe_id}><span className="text-tertiary">{t('recipe')}</span><strong>{flavor.name}</strong><span>{t('cookingTarget')}: <b>{displayGrams(flavor.target_finished_g)} g</b></span><span>{t('cookingSuggestedMeat')}: <b>{displayGrams(flavor.suggested_meat_g)} g</b></span>{flavor.issues.map(issue => <small className="text-warning" key={issue.code}>{cookingIssueLabel(issue.code, t)}</small>)}{options.length > 0 && <Form.Group className="mt-2"><SelectDropdown isDisabled={pendingCreate} label={t('cookingBaseIngredient')} options={options} value={options.find(option => option.value === selectedBase) || null} onChange={(option: {value:number}|null) => { setPreviewDirty(true); setBaseSelections(current => ({...current, [String(flavor.recipe_id)]:option?.value || 0})); }} /></Form.Group>}{!options.length && <small className="text-warning">{t('cookingBaseNotAvailable')}</small>}</article>; })}</div>
         {preview.plan.issues.map((issue, index) => <Alert variant="warning" key={`${issue.code}-${index}`}>{cookingIssueLabel(issue.code, t)}</Alert>)}
-        <div className="cooking-create-run"><Form.Control disabled={pendingCreate} value={title} onChange={event => setTitle(event.target.value)} placeholder={t('cookingRunName')} aria-label={t('cookingRunName')} /><Button onClick={() => void createRun()} disabled={busy || pendingCreate || Boolean(pendingStockAction) || previewDirty || !baseSelectionComplete || preview.active_runs.some(run => !acknowledged.includes(run.id))}><FaPlus className="me-2" />{t('cookingStartRun')}</Button></div>
+        <div className="cooking-create-run"><Form.Control disabled={pendingCreate} value={title} onChange={event => setTitle(event.target.value)} placeholder={t('cookingRunName')} aria-label={t('cookingRunName')} /><Button onClick={() => void createRun()} disabled={busy || pendingCreate || Boolean(pendingStockAction) || !previewIsCurrent || !baseSelectionComplete || preview.active_runs.some(run => !acknowledged.includes(run.id))}><FaPlus className="me-2" />{t('cookingStartRun')}</Button></div>
       </div>}
     </section>
 

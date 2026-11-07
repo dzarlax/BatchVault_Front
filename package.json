@@ -15,6 +15,7 @@
     "test:costing": "node --test tests/order-cost-refresh.test.cjs tests/product-types.test.cjs tests/product-editor-state.test.cjs tests/editor-draft-state.test.cjs",
     "test:cooking": "node --test tests/cooking-api.test.cjs",
     "test:cooking:browser": "node tests/cooking.integration.browser.cjs",
+    "test:cooking:previews": "node tests/cooking-preview-race.browser.cjs",
     "test:cooking:recovery": "node tests/cooking-recovery.browser.cjs",
     "test:costing:browser": "node tests/run-costing-browser.cjs",
     "test:ui": "node --test tests/ui-review.browser.cjs tests/orders-recipes-ui.browser.cjs"

@@ -49,7 +49,7 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
     setCalculatedIngredients(ingredients.map((item: RecipeIngredient) => ({
       ...item, quantity: (Number(item.quantity) * ratio).toFixed(2),
     })));
-  }, [baseWeight, baseIngredient, recipe, cookingEnabled]);
+  }, [baseWeight, baseIngredient, recipe, cookingEnabled, show]);
 
   const previewOnServer = async () => {
     if (!baseIngredientId || !parseDecimalInput(baseWeight)) return;
