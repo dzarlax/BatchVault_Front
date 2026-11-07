@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import useTranslation from 'next-translate/useTranslation';
@@ -25,7 +25,7 @@ const CookingRunPage = () => {
   const enabled = auth.isAuthenticated && isWorkspaceReady && selectedWorkspace?.capabilities?.cooking_v1 === true;
   const api = useMemo(() => cookingApiFor(selectedWorkspaceId), [selectedWorkspaceId]);
   const { data: run, error, mutate } = useSWR<CookingRun>(workspaceKey(id > 0 ? `/api/cooking-runs/${id}` : '', selectedWorkspaceId, enabled && id > 0), workspaceFetcher);
-  const { mutate: refreshStock } = useSWR<CookingStock>(workspaceKey('/api/cooking-stock', selectedWorkspaceId, enabled), workspaceFetcher);
+  const { data: stockData, mutate: refreshStock } = useSWR<CookingStock>(workspaceKey('/api/cooking-stock', selectedWorkspaceId, enabled), workspaceFetcher);
   const [preparedMeat, setPreparedMeat] = useState('');
   const [actualMeat, setActualMeat] = useState<Record<number, string>>({});
   const [prepPreview, setPrepPreview] = useState<any>(null);
@@ -43,6 +43,14 @@ const CookingRunPage = () => {
   const [replanPreviewDirty, setReplanPreviewDirty] = useState(false);
   const [replanBases, setReplanBases] = useState<Record<string, number>>({});
   const [replanAcknowledged, setReplanAcknowledged] = useState<number[]>([]);
+  const prepPreviewFingerprint = useRef<string | null>(null);
+  const packingPreviewFingerprint = useRef<string | null>(null);
+  const laterPreviewFingerprint = useRef<string | null>(null);
+  const replanPreviewFingerprint = useRef<string | null>(null);
+  const currentPrepFingerprintRef = useRef('');
+  const currentPackingFingerprintRef = useRef('');
+  const currentLaterFingerprintRef = useRef('');
+  const currentReplanFingerprintRef = useRef('');
 
   const flavorPlans = run?.plan.flavors || [];
   const packageOptions = (run?.plan.products || []).map(product => ({ value: product.id, label: `${product.name} · ${displayGrams(product.net_weight_g)} g` }));
@@ -59,15 +67,17 @@ const CookingRunPage = () => {
     return selection[recipeId] || (!requiresExplicit ? flavor?.base_recipe_ingredient_id || 0 : 0);
   };
   const preparationComplete = parseDecimalInput(preparedMeat) !== '' && flavorPlans.every(flavor => parseDecimalInput(actualMeat[flavor.recipe_id] || '') !== '' && ingredientOptions(flavor.recipe_id).some(row => row.value === selectedBaseForFlavor(flavor.recipe_id)));
+  const mergedReplanBaseSelections = { ...(run?.plan_input?.base_selections || {}), ...replanBases };
+  const replanPlanInput = run?.plan_input ? { ...run.plan_input, run_id: id, base_selections: mergedReplanBaseSelections, acknowledged_run_ids: replanAcknowledged } : null;
   const replanBaseSelectionComplete = (replanPreview?.plan.flavors || []).every((flavor:any) => {
     const ids = flavor.recipe_snapshot.ingredients.filter((row:any) => row.type.toLowerCase() === 'base' && ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms'].includes(row.unit.trim().toLowerCase())).map((row:any) => row.recipe_ingredient_id);
     const requiresExplicit = hasBaseSelectionIssue(flavor.issues) || ids.length > 1;
-    const previous = run?.plan_input?.base_selections?.[String(flavor.recipe_id)];
-    const selected = replanBases[String(flavor.recipe_id)] || (requiresExplicit ? previous || 0 : flavor.base_recipe_ingredient_id);
+    const selected = mergedReplanBaseSelections[String(flavor.recipe_id)] || (requiresExplicit ? 0 : flavor.base_recipe_ingredient_id);
     return ids.length > 0 && ids.includes(selected);
   });
 
   useEffect(() => {
+    prepPreviewFingerprint.current = null; packingPreviewFingerprint.current = null; laterPreviewFingerprint.current = null; replanPreviewFingerprint.current = null;
     setBusy(false);
     setPreparedMeat(''); setActualMeat({}); setPrepPreview(null); setUsable({}); setPackLines({}); setPackPreview(null); setLaterPack({}); setLaterPreview(null); setSelection({}); setEditingPreparation(false); setReplanPreview(null); setReplanPreviewDirty(false); setReplanBases({}); setReplanAcknowledged([]);
     const action = id > 0 ? ['preparation', 'results', 'packing', 'archive', 'replan'].find(name => getCookingPendingBody(id, name, selectedWorkspaceId)) : undefined;
@@ -93,13 +103,26 @@ const CookingRunPage = () => {
     version: run?.version,
     flavors: flavorPlans.map(flavor => ({ recipe_id: flavor.recipe_id, actual_meat_g: parseDecimalInput(actualMeat[flavor.recipe_id] || ''), base_recipe_ingredient_id: selectedBaseForFlavor(flavor.recipe_id) })),
   });
+  const currentPrepFingerprint = JSON.stringify([contextKey, prepBody()]);
+  currentPrepFingerprintRef.current = currentPrepFingerprint;
+  const packingPreviewInput = { lines: initialPackLines, actual_usable_g: outputLines };
+  const currentPackingFingerprint = JSON.stringify([contextKey, packingPreviewInput, run?.version, run?.stock_version, stockData?.version]);
+  currentPackingFingerprintRef.current = currentPackingFingerprint;
+  const laterPackingLines = Object.entries(laterPack).map(([product_id, quantity]) => ({ product_id: Number(product_id), quantity: Number(quantity) })).filter(line => line.quantity > 0);
+  const currentLaterFingerprint = JSON.stringify([contextKey, laterPackingLines, run?.version, run?.stock_version, stockData?.version]);
+  currentLaterFingerprintRef.current = currentLaterFingerprint;
+  const currentReplanFingerprint = JSON.stringify([contextKey, replanPlanInput, run?.version, run?.stock_version, stockData?.version]);
+  currentReplanFingerprintRef.current = currentReplanFingerprint;
+  const prepPreviewIsCurrent = Boolean(prepPreview && prepPreviewFingerprint.current === currentPrepFingerprint);
+  const packPreviewIsCurrent = Boolean(packPreview && packingPreviewFingerprint.current === currentPackingFingerprint);
+  const laterPreviewIsCurrent = Boolean(laterPreview && laterPreviewFingerprint.current === currentLaterFingerprint);
   const perform = async (action: string, call: (operationId: string) => Promise<unknown>, refresh = true) => {
     if (pendingRecovery) return;
     const requestContext = contextKey;
     const operationScope = cookingOperationScope(selectedWorkspaceId);
     setBusy(true); setErrorKey('');
     const operationId = cookingOperationId(id, action, selectedWorkspaceId);
-    try { await call(operationId); clearCookingOperationId(id, action, selectedWorkspaceId, operationScope); if (activeContext.current !== requestContext) return; if (refresh) { await mutate(); await refreshStock(); setPendingRecovery(null); if (action === 'preparation') setEditingPreparation(false); if (action === 'replan') { setReplanPreview(null); setReplanPreviewDirty(false); } } }
+    try { await call(operationId); clearCookingOperationId(id, action, selectedWorkspaceId, operationScope); if (activeContext.current !== requestContext) return; if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } if (refresh) { await mutate(); await refreshStock(); setPendingRecovery(null); if (action === 'preparation') setEditingPreparation(false); } }
     catch (cause) {
       const outcome = operationErrorMessage(cause);
       if (operationWasRejected(cause)) clearCookingOperationId(id, action, selectedWorkspaceId, operationScope);
@@ -114,38 +137,51 @@ const CookingRunPage = () => {
 
   const previewPreparation = async () => {
     const requestContext = contextKey;
+    const body = prepBody();
+    const requestFingerprint = currentPrepFingerprint;
+    setPrepPreview(null);
+    prepPreviewFingerprint.current = null;
     setBusy(true); setErrorKey('');
-    try { const result = await api.preparationPreview(prepBody()); if (activeContext.current === requestContext) setPrepPreview(result); }
-    catch (cause) { if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
+    try { const result = await api.preparationPreview(body); if (activeContext.current === requestContext && currentPrepFingerprintRef.current === requestFingerprint) { prepPreviewFingerprint.current = requestFingerprint; setPrepPreview(result); } }
+    catch (cause) { if (activeContext.current === requestContext && currentPrepFingerprintRef.current === requestFingerprint) setErrorKey(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
   const savePreparation = () => {
     if (!canStartFreshMutation()) return;
+    if (!prepPreviewIsCurrent) return;
     const body = cookingRequestBody(id, 'preparation', operation_id => ({ ...prepBody(), operation_id }), selectedWorkspaceId);
     return perform('preparation', () => api.savePreparation(id, body));
   };
   const previewPacking = async () => {
     const requestContext = contextKey;
+    const requestFingerprint = currentPackingFingerprint;
+    setPackPreview(null);
+    packingPreviewFingerprint.current = null;
     setBusy(true); setErrorKey('');
-    try { const result = await api.packingPreview(id, { lines: initialPackLines, actual_usable_g: outputLines }); if (activeContext.current === requestContext) setPackPreview(result); }
-    catch (cause) { if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
+    try { const result = await api.packingPreview(id, packingPreviewInput); if (activeContext.current === requestContext && currentPackingFingerprintRef.current === requestFingerprint) { packingPreviewFingerprint.current = requestFingerprint; setPackPreview(result); } }
+    catch (cause) { if (activeContext.current === requestContext && currentPackingFingerprintRef.current === requestFingerprint) setErrorKey(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
   const saveResults = () => {
     if (!canStartFreshMutation()) return;
+    if (initialPackLines.length && !packPreviewIsCurrent) return;
     const body = cookingRequestBody(id, 'results', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, actual_usable_g: outputLines, ...(initialPackLines.length ? { packing: { lines: initialPackLines } } : {}) }), selectedWorkspaceId);
     return perform('results', () => api.results(id, body));
   };
   const previewLater = async () => {
     const requestContext = contextKey;
+    const requestFingerprint = currentLaterFingerprint;
+    setLaterPreview(null);
+    laterPreviewFingerprint.current = null;
     setBusy(true); setErrorKey('');
-    try { const result = await api.packingPreview(id, { lines: Object.entries(laterPack).map(([product_id, quantity]) => ({ product_id: Number(product_id), quantity: Number(quantity) })).filter(line => line.quantity > 0) }); if (activeContext.current === requestContext) setLaterPreview(result); }
-    catch (cause) { if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
+    try { const result = await api.packingPreview(id, { lines: laterPackingLines }); if (activeContext.current === requestContext && currentLaterFingerprintRef.current === requestFingerprint) { laterPreviewFingerprint.current = requestFingerprint; setLaterPreview(result); } }
+    catch (cause) { if (activeContext.current === requestContext && currentLaterFingerprintRef.current === requestFingerprint) setErrorKey(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
   const saveLaterPacking = () => {
     if (!canStartFreshMutation()) return;
-    const body = cookingRequestBody(id, 'packing', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, lines: Object.entries(laterPack).map(([product_id, quantity]) => ({ product_id: Number(product_id), quantity: Number(quantity) })).filter(line => line.quantity > 0) }), selectedWorkspaceId);
+    if (!laterPreviewIsCurrent) return;
+    const body = cookingRequestBody(id, 'packing', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, lines: laterPackingLines }), selectedWorkspaceId);
     return perform('packing', () => api.pack(id, body));
   };
   const archive = () => {
@@ -157,17 +193,22 @@ const CookingRunPage = () => {
   const previewReplan = async () => {
     if (!run?.plan_input) return;
     const requestContext = contextKey;
+    const requestFingerprint = currentReplanFingerprint;
+    const requestInput = replanPlanInput;
+    setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false);
     setBusy(true); setErrorKey('');
     try {
-      const result = await api.plan({ ...run.plan_input, run_id: id, ...(Object.keys(replanBases).length ? { base_selections: replanBases } : {}), acknowledged_run_ids: replanAcknowledged });
-      if (activeContext.current === requestContext) { setReplanPreview(result); setReplanPreviewDirty(false); }
-    } catch (cause) { if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
+      if (!requestInput) return;
+      const result = await api.plan(requestInput);
+      if (activeContext.current === requestContext && currentReplanFingerprintRef.current === requestFingerprint) { replanPreviewFingerprint.current = requestFingerprint; setReplanPreview(result); setReplanPreviewDirty(false); }
+    } catch (cause) { if (activeContext.current === requestContext && currentReplanFingerprintRef.current === requestFingerprint) setErrorKey(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
   const confirmReplan = () => {
     if (!canStartFreshMutation()) return;
-    if (!run || !replanPreview || replanPreviewDirty || !run.plan_input) return;
-    const planInput = { ...run.plan_input, run_id: id, ...(Object.keys(replanBases).length ? { base_selections: replanBases } : {}), acknowledged_run_ids: replanAcknowledged };
+    if (!run || !replanPreview || replanPreviewDirty || replanPreviewFingerprint.current !== currentReplanFingerprint || !run.plan_input) return;
+    const planInput = replanPlanInput;
+    if (!planInput) return;
     const body = cookingRequestBody(id, 'replan', operation_id => ({ ...planInput, title: run.title, date: run.date, source_signature: replanPreview.source_signature, stock_version: replanPreview.stock_version, version: run.version, operation_id }), selectedWorkspaceId);
     return perform('replan', () => api.replan(id, body));
   };
@@ -184,7 +225,7 @@ const CookingRunPage = () => {
           : action === 'packing' ? await api.pack(id, body)
             : action === 'replan' ? await api.replan(id, body)
               : await api.archive(id, body);
-      clearCookingOperationId(id, action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) { setPendingRecovery(null); await mutate(); await refreshStock(); if (action === 'preparation') setEditingPreparation(false); if (action === 'replan') { setReplanPreview(null); setReplanPreviewDirty(false); } }
+      clearCookingOperationId(id, action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) { setPendingRecovery(null); if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; setEditingPreparation(false); } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } await mutate(); await refreshStock(); }
     } catch (cause) { if (operationWasRejected(cause)) { clearCookingOperationId(id, pendingRecovery.action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) setPendingRecovery(null); } if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
@@ -203,7 +244,7 @@ const CookingRunPage = () => {
     {pendingRecovery && <Alert variant="warning">{t('cookingRetryExact')} <Button size="sm" variant="outline-secondary" disabled={busy} onClick={() => void retryPending()}>{t('cookingRetry')}</Button></Alert>}
     {run.order_changes?.length ? <Alert variant="warning">{t('cookingOrderChanged')} {run.order_changes.map((issue, index) => <div key={`${issue.code}-${index}`}>{t('cookingIssueGeneric')}</div>)}</Alert> : null}
 
-    {(run.state === 'draft' || run.state === 'prepared') && run.actual_output.length === 0 && run.plan_input && <section className="cooking-panel"><div className="cooking-section-heading"><div><span className="cooking-step">↻</span><h2>{t('cookingReplanTitle')}</h2></div><Button variant="outline-primary" disabled={busy} onClick={() => void previewReplan()}>{t('cookingPreviewReplan')}</Button></div><p className="text-tertiary">{t('cookingReplanHint')}</p>{replanPreview && <>{replanPreviewDirty && <Alert variant="warning" className="py-2">{t('cookingPreviewStale')}</Alert>}<div className="cooking-flavor-grid">{replanPreview.plan.flavors.map((flavor:any) => { const options = flavor.recipe_snapshot.ingredients.filter((row:any) => row.type.toLowerCase() === 'base' && ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms'].includes(row.unit.trim().toLowerCase())).map((row:any) => ({value:row.recipe_ingredient_id,label:`${row.name} · ${row.quantity} ${row.unit}`})); const needsExplicit = hasBaseSelectionIssue(flavor.issues) || options.length > 1; const previous = run.plan_input?.base_selections?.[String(flavor.recipe_id)]; const selected = replanBases[String(flavor.recipe_id)] || (needsExplicit ? previous || 0 : flavor.base_recipe_ingredient_id); return <article className="cooking-flavor-card" key={flavor.recipe_id}><strong>{flavor.name}</strong><span>{t('cookingTarget')}: {displayGrams(flavor.target_finished_g)} g</span><span>{t('cookingSuggestedMeat')}: {displayGrams(flavor.suggested_meat_g)} g</span>{options.length > 0 && <Form.Group><SelectDropdown label={t('cookingBaseIngredient')} options={options} value={options.find((option:any) => option.value === selected) || null} onChange={(option:{value:number}|null) => { setReplanPreviewDirty(true); setReplanBases(current => ({...current,[String(flavor.recipe_id)]:option?.value || 0})); }} /></Form.Group>}{!options.length && <small className="text-warning">{t('cookingBaseNotAvailable')}</small>}</article>; })}</div>{replanPreview.active_runs?.length > 0 && <Alert variant="warning">{t('cookingActiveRuns')}{replanPreview.active_runs.map((active:any) => <Form.Check key={active.id} label={active.title} disabled={pendingRecovery !== null} checked={replanAcknowledged.includes(active.id)} onChange={event => { setReplanPreviewDirty(true); setReplanAcknowledged(current => event.target.checked ? [...current, active.id] : current.filter(value => value !== active.id)); }} />)}</Alert>}<Alert variant="warning">{t('cookingReplanResetWarning')}</Alert><div className="cooking-actions"><Button disabled={busy || pendingRecovery !== null || replanPreviewDirty || !replanBaseSelectionComplete || replanPreview.active_runs?.some((active:any) => !replanAcknowledged.includes(active.id))} onClick={confirmReplan}>{t('cookingConfirmReplan')}</Button></div></>}</section>}
+    {(run.state === 'draft' || run.state === 'prepared') && run.actual_output.length === 0 && run.plan_input && <section className="cooking-panel"><div className="cooking-section-heading"><div><span className="cooking-step">↻</span><h2>{t('cookingReplanTitle')}</h2></div><Button variant="outline-primary" disabled={busy} onClick={() => void previewReplan()}>{t('cookingPreviewReplan')}</Button></div><p className="text-tertiary">{t('cookingReplanHint')}</p>{replanPreview && <>{replanPreviewDirty && <Alert variant="warning" className="py-2">{t('cookingPreviewStale')}</Alert>}<div className="cooking-flavor-grid">{replanPreview.plan.flavors.map((flavor:any) => { const options = flavor.recipe_snapshot.ingredients.filter((row:any) => row.type.toLowerCase() === 'base' && ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms'].includes(row.unit.trim().toLowerCase())).map((row:any) => ({value:row.recipe_ingredient_id,label:`${row.name} · ${row.quantity} ${row.unit}`})); const needsExplicit = hasBaseSelectionIssue(flavor.issues) || options.length > 1; const selected = mergedReplanBaseSelections[String(flavor.recipe_id)] || (needsExplicit ? 0 : flavor.base_recipe_ingredient_id); return <article className="cooking-flavor-card" key={flavor.recipe_id}><strong>{flavor.name}</strong><span>{t('cookingTarget')}: {displayGrams(flavor.target_finished_g)} g</span><span>{t('cookingSuggestedMeat')}: {displayGrams(flavor.suggested_meat_g)} g</span>{options.length > 0 && <Form.Group><SelectDropdown label={t('cookingBaseIngredient')} options={options} value={options.find((option:any) => option.value === selected) || null} onChange={(option:{value:number}|null) => { setReplanPreviewDirty(true); setReplanBases(current => ({...current,[String(flavor.recipe_id)]:option?.value || 0})); }} /></Form.Group>}{!options.length && <small className="text-warning">{t('cookingBaseNotAvailable')}</small>}</article>; })}</div>{replanPreview.active_runs?.length > 0 && <Alert variant="warning">{t('cookingActiveRuns')}{replanPreview.active_runs.map((active:any) => <Form.Check key={active.id} label={active.title} disabled={pendingRecovery !== null} checked={replanAcknowledged.includes(active.id)} onChange={event => { setReplanPreviewDirty(true); setReplanAcknowledged(current => event.target.checked ? [...current, active.id] : current.filter(value => value !== active.id)); }} />)}</Alert>}<Alert variant="warning">{t('cookingReplanResetWarning')}</Alert><div className="cooking-actions"><Button disabled={busy || pendingRecovery !== null || replanPreviewDirty || replanPreviewFingerprint.current !== currentReplanFingerprint || !replanBaseSelectionComplete || replanPreview.active_runs?.some((active:any) => !replanAcknowledged.includes(active.id))} onClick={confirmReplan}>{t('cookingConfirmReplan')}</Button></div></>}</section>}
 
     <section className="cooking-panel"><div className="cooking-section-heading"><div><span className="cooking-step">01</span><h2>{t('cookingPlanTitle')}</h2></div></div><div className="cooking-flavor-grid">{flavorPlans.map(flavor => <article className="cooking-flavor-card" key={flavor.recipe_id}><strong>{flavor.name}</strong><span>{t('cookingTarget')}: <b>{displayGrams(flavor.target_finished_g)} g</b></span><span>{t('cookingSuggestedMeat')}: <b>{displayGrams(flavor.suggested_meat_g)} g</b></span></article>)}</div></section>
 
@@ -214,13 +255,13 @@ const CookingRunPage = () => {
     {(run.state === 'draft' || (run.state === 'prepared' && editingPreparation)) && <section className="cooking-panel"><div className="cooking-section-heading"><div><span className="cooking-step">02</span><h2>{t('cookingActualMeat')}</h2></div>{editingPreparation && <Button variant="outline-secondary" size="sm" onClick={() => setEditingPreparation(false)}>{t('cancel')}</Button>}</div><Alert variant="light" className="cooking-note">{t('cookingActualMeatNote')}</Alert>
       <Form.Group className="cooking-total-input"><Form.Label>{t('cookingPreparedMeatTotal')} (g)</Form.Label><Form.Control disabled={pendingRecovery !== null} inputMode="decimal" value={preparedMeat} onChange={event => { setPreparedMeat(event.target.value); setPrepPreview(null); }} /></Form.Group>
       <div className="cooking-actual-grid">{flavorPlans.map(flavor => <div className="cooking-actual-row" key={flavor.recipe_id}><strong>{flavor.name}</strong><Form.Group><Form.Label>{t('cookingActualFlavorMeat')} (g)</Form.Label><Form.Control disabled={pendingRecovery !== null} inputMode="decimal" value={actualMeat[flavor.recipe_id] || ''} onChange={event => { setActualMeat(current => ({ ...current, [flavor.recipe_id]: event.target.value })); setPrepPreview(null); }} /></Form.Group><Form.Group><SelectDropdown isDisabled={pendingRecovery !== null} label={t('cookingBaseIngredient')} options={ingredientOptions(flavor.recipe_id)} value={ingredientOptions(flavor.recipe_id).find(option => option.value === selectedBaseForFlavor(flavor.recipe_id)) || null} onChange={(option: {value:number}|null) => { setSelection(current => ({ ...current, [flavor.recipe_id]: option?.value || 0 })); setPrepPreview(null); }} /></Form.Group></div>)}</div>
-      <div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || !preparationComplete} onClick={() => void previewPreparation()}>{t('cookingPreviewMarinade')}</Button>{prepPreview && <Button disabled={busy} onClick={savePreparation}><FaCheck className="me-2" />{t('cookingSavePreparation')}</Button>}</div>
-      {prepPreview && <div className="cooking-marinade"><h3>{t('cookingMarinadeIngredients')}</h3><div className="cooking-flavor-grid">{prepPreview.flavors?.map((flavor: any) => <article className="cooking-flavor-card" key={flavor.recipe_id}><strong>{flavor.name}</strong><span>{t('cookingActualFlavorMeat')}: {displayGrams(flavor.actual_meat_g)} g</span>{flavor.ingredients.map((ingredient: any) => <span key={`${ingredient.ingredient_id}-${ingredient.recipe_ingredient_id}`}>{ingredient.name}: {ingredient.quantity} {ingredient.unit}</span>)}</article>)}</div><div className="cooking-total-line">{t('cookingAllocatedMeat')}: <strong>{displayGrams(prepPreview.allocated_meat_g)} g</strong> · {t('cookingUnallocatedMeat')}: <strong>{displayGrams(prepPreview.unallocated_meat_g)} g</strong></div><CombinedIngredients ingredients={prepPreview.ingredients_total || []} t={t} /></div>}
+      <div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || !preparationComplete} onClick={() => void previewPreparation()}>{t('cookingPreviewMarinade')}</Button>{prepPreviewIsCurrent && <Button disabled={busy} onClick={savePreparation}><FaCheck className="me-2" />{t('cookingSavePreparation')}</Button>}</div>
+      {prepPreviewIsCurrent && <div className="cooking-marinade"><h3>{t('cookingMarinadeIngredients')}</h3><div className="cooking-flavor-grid">{prepPreview.flavors?.map((flavor: any) => <article className="cooking-flavor-card" key={flavor.recipe_id}><strong>{flavor.name}</strong><span>{t('cookingActualFlavorMeat')}: {displayGrams(flavor.actual_meat_g)} g</span>{flavor.ingredients.map((ingredient: any) => <span key={`${ingredient.ingredient_id}-${ingredient.recipe_ingredient_id}`}>{ingredient.name}: {ingredient.quantity} {ingredient.unit}</span>)}</article>)}</div><div className="cooking-total-line">{t('cookingAllocatedMeat')}: <strong>{displayGrams(prepPreview.allocated_meat_g)} g</strong> · {t('cookingUnallocatedMeat')}: <strong>{displayGrams(prepPreview.unallocated_meat_g)} g</strong></div><CombinedIngredients ingredients={prepPreview.ingredients_total || []} t={t} /></div>}
     </section>}
 
     {(run.state === 'prepared' || run.state === 'cooked') && <section className="cooking-panel"><div className="cooking-section-heading"><div><span className="cooking-step">03</span><h2>{t('cookingYieldPacking')}</h2></div></div>
-      {run.state === 'prepared' && <><p className="text-tertiary">{t('cookingUsableHint')}</p><div className="cooking-actual-grid">{flavorPlans.map(flavor => <div className="cooking-actual-row" key={flavor.recipe_id}><strong>{flavor.name}</strong><Form.Group><Form.Label>{t('cookingUsableGrams')} (g)</Form.Label><Form.Control disabled={pendingRecovery !== null} inputMode="decimal" value={usable[flavor.recipe_id] || ''} onChange={event => { setUsable(current => ({ ...current, [flavor.recipe_id]: event.target.value })); setPackPreview(null); }} /></Form.Group></div>)}</div><h3 className="h5 mt-4">{t('cookingPackNow')}</h3><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={packLines} onChange={value => { setPackLines(value); setPackPreview(null); }} t={t} /><div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || outputLines.length !== flavorPlans.length} onClick={() => void previewPacking()}>{t('cookingPreviewPacking')}</Button>{outputLines.length === flavorPlans.length && <Button disabled={busy || pendingRecovery !== null} onClick={saveResults}>{t('cookingSaveResults')}</Button>}</div>{packPreview && <PackingSummary data={packPreview} flavors={flavorPlans} t={t} />}</>}
-      {run.state === 'cooked' && <><p className="text-tertiary">{t('cookingCookedAvailable')}</p><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={laterPack} onChange={setLaterPack} t={t} /><div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null} onClick={() => void previewLater()}>{t('cookingPreviewPacking')}</Button><Button disabled={busy || pendingRecovery !== null || !Object.values(laterPack).some(value => Number(value) > 0)} onClick={saveLaterPacking}><FaBox className="me-2" />{t('cookingSavePacking')}</Button></div>{laterPreview && <PackingSummary data={laterPreview} flavors={flavorPlans} t={t} />}</>}
+      {run.state === 'prepared' && <><p className="text-tertiary">{t('cookingUsableHint')}</p><div className="cooking-actual-grid">{flavorPlans.map(flavor => <div className="cooking-actual-row" key={flavor.recipe_id}><strong>{flavor.name}</strong><Form.Group><Form.Label>{t('cookingUsableGrams')} (g)</Form.Label><Form.Control disabled={pendingRecovery !== null} inputMode="decimal" value={usable[flavor.recipe_id] || ''} onChange={event => { setUsable(current => ({ ...current, [flavor.recipe_id]: event.target.value })); setPackPreview(null); }} /></Form.Group></div>)}</div><h3 className="h5 mt-4">{t('cookingPackNow')}</h3><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={packLines} onChange={value => { setPackLines(value); setPackPreview(null); }} t={t} /><div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || outputLines.length !== flavorPlans.length} onClick={() => void previewPacking()}>{t('cookingPreviewPacking')}</Button>{outputLines.length === flavorPlans.length && <Button disabled={busy || pendingRecovery !== null || (initialPackLines.length > 0 && !packPreviewIsCurrent)} onClick={saveResults}>{t('cookingSaveResults')}</Button>}</div>{packPreviewIsCurrent && <PackingSummary data={packPreview} flavors={flavorPlans} t={t} />}</>}
+      {run.state === 'cooked' && <><p className="text-tertiary">{t('cookingCookedAvailable')}</p><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={laterPack} onChange={setLaterPack} t={t} /><div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null} onClick={() => void previewLater()}>{t('cookingPreviewPacking')}</Button><Button disabled={busy || pendingRecovery !== null || !laterPreviewIsCurrent || !Object.values(laterPack).some(value => Number(value) > 0)} onClick={saveLaterPacking}><FaBox className="me-2" />{t('cookingSavePacking')}</Button></div>{laterPreviewIsCurrent && <PackingSummary data={laterPreview} flavors={flavorPlans} t={t} />}</>}
       {run.lots?.length > 0 && <div className="cooking-lots"><h3 className="h5">{t('cookingOutputLots')}</h3>{run.lots.map(lot => <div className="cooking-stock-row" key={lot.id}><strong>{lot.name}</strong><span>{displayGrams(lot.available)} {lot.unit === 'g' ? 'g' : t('cookingPacks')}</span></div>)}</div>}
     </section>}
 
