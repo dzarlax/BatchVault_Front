@@ -68,9 +68,11 @@ const CookingHome = () => {
   });
 
   useEffect(() => {
+    setBusy(false);
+    setLoadingMore(false);
     setSelectedOrders([]); setExtraRecipe(null); setExtraGrams(''); setPreview(null); setPreviewDirty(false); setTitle(''); setBaseSelections({}); setAcknowledged([]); setError('');
     setStockKind('initial'); setStockLot(null); setStockRecipe(null); setStockProduct(null); setStockItemType('recipe'); setStockQuantity(''); setStockReason('');
-    setOlderRuns([]); setNextCursor(null); setLoadingMore(false); setPendingCreate(Boolean(getCookingPendingBody('new', 'create', selectedWorkspaceId)));
+    setOlderRuns([]); setNextCursor(null); setPendingCreate(Boolean(getCookingPendingBody('new', 'create', selectedWorkspaceId)));
     const stockAction = ['initial','correction','waste','return'].map(kind => `stock-${kind}`).find(action => getCookingPendingBody('new', action, selectedWorkspaceId));
     setPendingStockAction(stockAction || null);
   }, [contextKey, selectedWorkspaceId]);

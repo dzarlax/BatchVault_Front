@@ -27,6 +27,18 @@ test('decimal input accepts localized comma but rejects incomplete and negative 
   assert.equal(cooking.parseSignedDecimalInput('-2,25'), '-2.25');
 });
 
+test('recipe calculator normalizes kilogram base quantities to gram request weights', () => {
+  assert.equal(cooking.isSupportedMassUnit('kg'), true);
+  assert.equal(cooking.isSupportedMassUnit('kilograms'), true);
+  assert.equal(cooking.normalizeMassQuantityToGrams('1', 'kg'), '1000');
+  assert.equal(cooking.normalizeMassQuantityToGrams('1.001', 'kg'), '1001');
+  assert.equal(cooking.normalizeMassQuantityToGrams('0.0005', 'kg'), '0.5');
+  assert.equal(cooking.normalizeMassQuantityToGrams('1,25', 'kilograms'), '1250');
+  assert.equal(cooking.normalizeMassQuantityToGrams('350', 'grams'), '350');
+  assert.equal(cooking.normalizeMassQuantityToGrams('1', 'lb'), null);
+  assert.equal(cooking.normalizeMassQuantityToGrams('not-a-number', 'kg'), null);
+});
+
 test('create run sends the flat plan and the workspace captured by its client', async () => {
   const requests = [];
   const api = cooking.cookingApiFor('workspace-7', async (url, options) => {

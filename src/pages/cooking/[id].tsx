@@ -68,7 +68,8 @@ const CookingRunPage = () => {
   });
 
   useEffect(() => {
-    setPreparedMeat(''); setActualMeat({}); setPrepPreview(null); setUsable({}); setPackLines({}); setPackPreview(null); setLaterPack({}); setLaterPreview(null); setSelection({}); setEditingPreparation(false); setReplanPreview(null); setReplanPreviewDirty(false); setReplanBases({}); setReplanAcknowledged([]); setBusy(false);
+    setBusy(false);
+    setPreparedMeat(''); setActualMeat({}); setPrepPreview(null); setUsable({}); setPackLines({}); setPackPreview(null); setLaterPack({}); setLaterPreview(null); setSelection({}); setEditingPreparation(false); setReplanPreview(null); setReplanPreviewDirty(false); setReplanBases({}); setReplanAcknowledged([]);
     const action = id > 0 ? ['preparation', 'results', 'packing', 'archive', 'replan'].find(name => getCookingPendingBody(id, name, selectedWorkspaceId)) : undefined;
     const body = action ? getCookingPendingBody(id, action, selectedWorkspaceId) : null;
     setPendingRecovery(action && body ? { action, body } : null);

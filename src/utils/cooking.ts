@@ -130,6 +130,29 @@ export const parseSignedDecimalInput = (value: string) => {
 
 export const hasBaseSelectionIssue = (issues: { code: string }[] = []) => issues.some(issue => issue.code.toLowerCase().includes('base') && issue.code.toLowerCase().includes('select'));
 
+const massUnitGrams = (unit: string) => {
+  switch (unit.trim().toLowerCase()) {
+    case 'g': case 'gram': case 'grams': return 1;
+    case 'kg': case 'kilogram': case 'kilograms': return 1000;
+    default: return null;
+  }
+};
+
+export const isSupportedMassUnit = (unit: string) => massUnitGrams(unit) !== null;
+
+export const normalizeMassQuantityToGrams = (quantity: string, unit: string) => {
+  const multiplier = massUnitGrams(unit);
+  const parsed = parseDecimalInput(quantity);
+  if (multiplier === null || !parsed) return null;
+  if (multiplier === 1) return parsed;
+  const [whole, fraction = ''] = parsed.split('.');
+  const digits = `${whole}${fraction}`;
+  const decimalPosition = whole.length + 3;
+  const integer = digits.slice(0, decimalPosition).padEnd(decimalPosition, '0').replace(/^0+(?=\d)/, '') || '0';
+  const gramsFraction = digits.slice(decimalPosition).replace(/0+$/, '');
+  return gramsFraction ? `${integer}.${gramsFraction}` : integer;
+};
+
 export const displayGrams = (value?: string | null) => {
   if (!value) return '—';
   const number = Number(value);
