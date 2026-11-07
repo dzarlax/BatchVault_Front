@@ -56,6 +56,8 @@ const CookingRunPage = () => {
   const packageOptions = (run?.plan.products || []).map(product => ({ value: product.id, label: `${product.name} · ${displayGrams(product.net_weight_g)} g` }));
   const outputLines = useMemo(() => flavorPlans.map(flavor => ({ recipe_id: flavor.recipe_id, quantity_g: parseDecimalInput(usable[flavor.recipe_id] || '') })).filter(row => row.quantity_g), [flavorPlans, usable]);
   const initialPackLines: CookingPackingLine[] = Object.entries(packLines).map(([product_id, quantity]) => ({ product_id: Number(product_id), quantity: Number(quantity) })).filter(row => Number.isInteger(row.quantity) && row.quantity > 0);
+  const initialPackCountsValid = arePackCountsValid(packLines);
+  const laterPackCountsValid = arePackCountsValid(laterPack);
   const ingredientOptions = (recipeId: number) => {
     const rows = run?.plan.flavors.find(flavor => flavor.recipe_id === recipeId)?.recipe_snapshot.ingredients || [];
     return rows.filter(row => row.type.toLowerCase() === 'base' && ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms'].includes(row.unit.trim().toLowerCase())).map(row => ({ value: row.recipe_ingredient_id, label: `${row.name} · ${row.quantity} ${row.unit}` }));
@@ -122,10 +124,10 @@ const CookingRunPage = () => {
     const operationScope = cookingOperationScope(selectedWorkspaceId);
     setBusy(true); setErrorKey('');
     const operationId = cookingOperationId(id, action, selectedWorkspaceId);
-    try { await call(operationId); clearCookingOperationId(id, action, selectedWorkspaceId, operationScope); if (activeContext.current !== requestContext) return; if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } if (refresh) { await mutate(); await refreshStock(); setPendingRecovery(null); if (action === 'preparation') setEditingPreparation(false); } }
+    try { await call(operationId); clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, operationId); if (activeContext.current !== requestContext) return; if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } if (refresh) { await mutate(); await refreshStock(); setPendingRecovery(null); if (action === 'preparation') setEditingPreparation(false); } }
     catch (cause) {
       const outcome = operationErrorMessage(cause);
-      if (operationWasRejected(cause)) clearCookingOperationId(id, action, selectedWorkspaceId, operationScope);
+      if (operationWasRejected(cause)) clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, operationId);
       if (activeContext.current === requestContext) {
         if (operationWasRejected(cause)) setPendingRecovery(null);
         if (outcome === 'ambiguous') setPendingRecovery({ action, body: getCookingPendingBody(id, action, selectedWorkspaceId) });
@@ -153,6 +155,7 @@ const CookingRunPage = () => {
     return perform('preparation', () => api.savePreparation(id, body));
   };
   const previewPacking = async () => {
+    if (!initialPackCountsValid) return;
     const requestContext = contextKey;
     const requestFingerprint = currentPackingFingerprint;
     setPackPreview(null);
@@ -164,11 +167,13 @@ const CookingRunPage = () => {
   };
   const saveResults = () => {
     if (!canStartFreshMutation()) return;
+    if (!initialPackCountsValid) return;
     if (initialPackLines.length && !packPreviewIsCurrent) return;
     const body = cookingRequestBody(id, 'results', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, actual_usable_g: outputLines, ...(initialPackLines.length ? { packing: { lines: initialPackLines } } : {}) }), selectedWorkspaceId);
     return perform('results', () => api.results(id, body));
   };
   const previewLater = async () => {
+    if (!laterPackCountsValid) return;
     const requestContext = contextKey;
     const requestFingerprint = currentLaterFingerprint;
     setLaterPreview(null);
@@ -180,6 +185,7 @@ const CookingRunPage = () => {
   };
   const saveLaterPacking = () => {
     if (!canStartFreshMutation()) return;
+    if (!laterPackCountsValid) return;
     if (!laterPreviewIsCurrent) return;
     const body = cookingRequestBody(id, 'packing', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, lines: laterPackingLines }), selectedWorkspaceId);
     return perform('packing', () => api.pack(id, body));
@@ -218,15 +224,15 @@ const CookingRunPage = () => {
     const requestContext = contextKey;
     const operationScope = cookingOperationScope(selectedWorkspaceId);
     setBusy(true); setErrorKey('');
+    const { action, body } = pendingRecovery;
     try {
-      const { action, body } = pendingRecovery;
       const updated = action === 'preparation' ? await api.savePreparation(id, body)
         : action === 'results' ? await api.results(id, body)
           : action === 'packing' ? await api.pack(id, body)
             : action === 'replan' ? await api.replan(id, body)
               : await api.archive(id, body);
-      clearCookingOperationId(id, action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) { setPendingRecovery(null); if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; setEditingPreparation(false); } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } await mutate(); await refreshStock(); }
-    } catch (cause) { if (operationWasRejected(cause)) { clearCookingOperationId(id, pendingRecovery.action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) setPendingRecovery(null); } if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
+      clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) { setPendingRecovery(null); if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; setEditingPreparation(false); } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } await mutate(); await refreshStock(); }
+    } catch (cause) { if (operationWasRejected(cause)) { clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) setPendingRecovery(null); } if (activeContext.current === requestContext) setErrorKey(operationErrorMessage(cause)); }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
 
@@ -260,8 +266,8 @@ const CookingRunPage = () => {
     </section>}
 
     {(run.state === 'prepared' || run.state === 'cooked') && <section className="cooking-panel"><div className="cooking-section-heading"><div><span className="cooking-step">03</span><h2>{t('cookingYieldPacking')}</h2></div></div>
-      {run.state === 'prepared' && <><p className="text-tertiary">{t('cookingUsableHint')}</p><div className="cooking-actual-grid">{flavorPlans.map(flavor => <div className="cooking-actual-row" key={flavor.recipe_id}><strong>{flavor.name}</strong><Form.Group><Form.Label>{t('cookingUsableGrams')} (g)</Form.Label><Form.Control disabled={pendingRecovery !== null} inputMode="decimal" value={usable[flavor.recipe_id] || ''} onChange={event => { setUsable(current => ({ ...current, [flavor.recipe_id]: event.target.value })); setPackPreview(null); }} /></Form.Group></div>)}</div><h3 className="h5 mt-4">{t('cookingPackNow')}</h3><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={packLines} onChange={value => { setPackLines(value); setPackPreview(null); }} t={t} /><div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || outputLines.length !== flavorPlans.length} onClick={() => void previewPacking()}>{t('cookingPreviewPacking')}</Button>{outputLines.length === flavorPlans.length && <Button disabled={busy || pendingRecovery !== null || (initialPackLines.length > 0 && !packPreviewIsCurrent)} onClick={saveResults}>{t('cookingSaveResults')}</Button>}</div>{packPreviewIsCurrent && <PackingSummary data={packPreview} flavors={flavorPlans} t={t} />}</>}
-      {run.state === 'cooked' && <><p className="text-tertiary">{t('cookingCookedAvailable')}</p><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={laterPack} onChange={setLaterPack} t={t} /><div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null} onClick={() => void previewLater()}>{t('cookingPreviewPacking')}</Button><Button disabled={busy || pendingRecovery !== null || !laterPreviewIsCurrent || !Object.values(laterPack).some(value => Number(value) > 0)} onClick={saveLaterPacking}><FaBox className="me-2" />{t('cookingSavePacking')}</Button></div>{laterPreviewIsCurrent && <PackingSummary data={laterPreview} flavors={flavorPlans} t={t} />}</>}
+      {run.state === 'prepared' && <><p className="text-tertiary">{t('cookingUsableHint')}</p><div className="cooking-actual-grid">{flavorPlans.map(flavor => <div className="cooking-actual-row" key={flavor.recipe_id}><strong>{flavor.name}</strong><Form.Group><Form.Label>{t('cookingUsableGrams')} (g)</Form.Label><Form.Control disabled={pendingRecovery !== null} inputMode="decimal" value={usable[flavor.recipe_id] || ''} onChange={event => { setUsable(current => ({ ...current, [flavor.recipe_id]: event.target.value })); setPackPreview(null); }} /></Form.Group></div>)}</div><h3 className="h5 mt-4">{t('cookingPackNow')}</h3><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={packLines} onChange={value => { setPackLines(value); setPackPreview(null); }} t={t} />{!initialPackCountsValid && <Alert variant="danger" className="py-2" role="alert">{t('cookingPackCountInvalid')}</Alert>}<div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || !initialPackCountsValid || outputLines.length !== flavorPlans.length} onClick={() => void previewPacking()}>{t('cookingPreviewPacking')}</Button>{outputLines.length === flavorPlans.length && <Button disabled={busy || pendingRecovery !== null || !initialPackCountsValid || (initialPackLines.length > 0 && !packPreviewIsCurrent)} onClick={saveResults}>{t('cookingSaveResults')}</Button>}</div>{packPreviewIsCurrent && <PackingSummary data={packPreview} flavors={flavorPlans} t={t} />}</>}
+      {run.state === 'cooked' && <><p className="text-tertiary">{t('cookingCookedAvailable')}</p><ProductPackInputs disabled={pendingRecovery !== null} options={packageOptions} values={laterPack} onChange={setLaterPack} t={t} />{!laterPackCountsValid && <Alert variant="danger" className="py-2" role="alert">{t('cookingPackCountInvalid')}</Alert>}<div className="cooking-actions"><Button variant="outline-primary" disabled={busy || pendingRecovery !== null || !laterPackCountsValid} onClick={() => void previewLater()}>{t('cookingPreviewPacking')}</Button><Button disabled={busy || pendingRecovery !== null || !laterPackCountsValid || !laterPreviewIsCurrent || !Object.values(laterPack).some(value => Number(value) > 0)} onClick={saveLaterPacking}><FaBox className="me-2" />{t('cookingSavePacking')}</Button></div>{laterPreviewIsCurrent && <PackingSummary data={laterPreview} flavors={flavorPlans} t={t} />}</>}
       {run.lots?.length > 0 && <div className="cooking-lots"><h3 className="h5">{t('cookingOutputLots')}</h3>{run.lots.map(lot => <div className="cooking-stock-row" key={lot.id}><strong>{lot.name}</strong><span>{displayGrams(lot.available)} {lot.unit === 'g' ? 'g' : t('cookingPacks')}</span></div>)}</div>}
     </section>}
 
@@ -270,6 +276,12 @@ const CookingRunPage = () => {
 };
 
 const ProductPackInputs: React.FC<{ options: {value:number;label:string}[]; values: Record<number,string>; onChange: React.Dispatch<React.SetStateAction<Record<number,string>>>; t: (key:string)=>string; disabled?: boolean }> = ({ options, values, onChange, t, disabled = false }) => <div className="cooking-pack-list">{options.map(option => <Form.Group key={option.value}><Form.Label>{option.label}</Form.Label><Form.Control disabled={disabled} inputMode="numeric" type="number" min="0" step="1" value={values[option.value] || ''} onChange={event => onChange(current => ({ ...current, [option.value]: event.target.value }))} placeholder={t('cookingPacksCount')} /></Form.Group>)}</div>;
+
+const arePackCountsValid = (values: Record<number, string>) => Object.values(values).every(value => {
+  if (value.trim() === '') return true;
+  const count = Number(value);
+  return Number.isSafeInteger(count) && count >= 0;
+});
 
 const CombinedIngredients: React.FC<{ ingredients: {recipe_ingredient_id:number;ingredient_id:number;name:string;unit:string;quantity:string}[]; t:(key:string)=>string }> = ({ ingredients, t }) => ingredients?.length ? <div className="cooking-marinade mt-3"><h3>{t('cookingCombinedIngredients')}</h3><div className="cooking-flavor-grid">{ingredients.map(ingredient => <span className="cooking-stock-row" key={`${ingredient.ingredient_id}-${ingredient.recipe_ingredient_id}`}><strong>{ingredient.name}</strong><span>{ingredient.quantity} {ingredient.unit}</span></span>)}</div></div> : null;
 

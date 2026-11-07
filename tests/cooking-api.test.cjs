@@ -130,7 +130,7 @@ test('pending operation id and exact body survive a new browser session and stay
   const otherAccount = cooking.cookingRequestBody(41, 'results', operation_id => ({ operation_id, actual_usable_g: [{ recipe_id: 1, quantity_g: '1' }] }), 'workspace-a');
   assert.notEqual(otherAccount.operation_id, body.operation_id);
   global.localStorage = { getItem: key => key === 'user' ? JSON.stringify({ id: 'account-a' }) : persistent.get(key) || null, setItem: (key, value) => persistent.set(key, value), removeItem: key => persistent.delete(key) };
-  cooking.clearCookingOperationId(41, 'results', 'workspace-a');
+  cooking.clearCookingOperationId(41, 'results', 'workspace-a', undefined, body.operation_id);
   const freshBody = cooking.cookingRequestBody(41, 'results', operation_id => ({ operation_id, actual_usable_g: [{ recipe_id: 1, quantity_g: '999' }] }), 'workspace-a');
   assert.notEqual(freshBody.operation_id, body.operation_id);
   delete global.localStorage;
@@ -159,6 +159,8 @@ test('legacy session pending body migrates only for matching scope and 5xx is am
   assert.deepEqual(cooking.getCookingPendingBody(41, 'results', 'workspace-a'), legacyBody);
   assert.equal(session.has(key), false);
   assert.equal(JSON.parse(local.get(key)).body.operation_id, 'legacy-id');
+  cooking.clearCookingOperationId(41, 'results', 'workspace-a', scope, legacyBody.operation_id);
+  assert.equal(cooking.getCookingPendingBody(41, 'results', 'workspace-a'), null);
   assert.equal(cooking.operationErrorMessage({ status: 503 }), 'ambiguous');
   assert.equal(cooking.operationErrorMessage({ status: 400 }), 'failed');
   delete global.localStorage;
@@ -190,10 +192,34 @@ test('late completion clears only the captured account scope', () => {
   const oldBody = cooking.cookingRequestBody(41, 'results', operation_id => ({ operation_id, value: 'account-a' }), 'workspace-a');
   accountId = 'account-b';
   const newBody = cooking.cookingRequestBody(41, 'results', operation_id => ({ operation_id, value: 'account-b' }), 'workspace-a');
-  cooking.clearCookingOperationId(41, 'results', 'workspace-a', oldScope);
+  cooking.clearCookingOperationId(41, 'results', 'workspace-a', oldScope, oldBody.operation_id);
   assert.deepEqual(cooking.getCookingPendingBody(41, 'results', 'workspace-a'), newBody);
   assert.notEqual(oldBody.operation_id, newBody.operation_id);
   delete global.localStorage;
   delete global.sessionStorage;
   delete global.window;
+});
+
+test('late completion preserves a newer operation in the same workspace', () => {
+  const store = new Map();
+  global.window = {};
+  global.localStorage = {
+    getItem: key => key === 'user' ? JSON.stringify({ id: 'account-a' }) : store.get(key) || null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key),
+  };
+  global.sessionStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  try {
+    const scope = cooking.cookingOperationScope('workspace-a');
+    const oldBody = cooking.cookingRequestBody(41, 'results', operation_id => ({ operation_id, value: 'old' }), 'workspace-a');
+    cooking.clearCookingOperationId(41, 'results', 'workspace-a', scope, oldBody.operation_id);
+    const newBody = cooking.cookingRequestBody(41, 'results', operation_id => ({ operation_id, value: 'new' }), 'workspace-a');
+    cooking.clearCookingOperationId(41, 'results', 'workspace-a', scope, oldBody.operation_id);
+    assert.deepEqual(cooking.getCookingPendingBody(41, 'results', 'workspace-a'), newBody);
+    assert.equal(cooking.cookingOperationId(41, 'results', 'workspace-a'), newBody.operation_id);
+  } finally {
+    delete global.localStorage;
+    delete global.sessionStorage;
+    delete global.window;
+  }
 });

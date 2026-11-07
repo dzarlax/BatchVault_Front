@@ -73,6 +73,7 @@ async function main() {
     else if (pathName === '/api/cooking-stock') result = { version: 1, lots: [], events: [] };
     else if (pathName === '/api/cooking-runs/777') result = cookingRun(777, 'draft');
     else if (pathName === '/api/cooking-runs/778') result = cookingRun(778, 'cooked');
+    else if (pathName === '/api/cooking-runs/779') result = cookingRun(779, 'prepared');
     else if (pathName === '/api/cooking/plan-preview' && method === 'POST') {
       planCalls++;
       if (planCalls === 1) { resolvePlanStarted(); await firstPlan.promise; result = planPreview('Obsolete preview'); }
@@ -89,6 +90,10 @@ async function main() {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
   });
   const page = await context.newPage();
+  const mutationRequests = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && /\/api\/cooking-runs\/(?:779\/results|778\/packings)$/.test(new URL(request.url()).pathname)) mutationRequests.push(new URL(request.url()).pathname);
+  });
   page.on('pageerror', error => errors.push(error.name));
   await page.addInitScript(() => {
     const token = ['eyJhbGciOiJIUzI1NiJ9', btoa(JSON.stringify({ userID: 7, exp: Math.floor(Date.now() / 1000) + 3600 })).replace(/=/g, ''), 'fixture'].join('.');
@@ -140,6 +145,30 @@ async function main() {
     await page.getByRole('button', { name: 'Preview packing' }).click();
     await page.getByText(/Total packs: 2/).waitFor();
 
+    const laterCount = page.locator('.cooking-pack-list input').first();
+    await laterCount.fill('-1');
+    await page.getByText('Enter a whole pack count of zero or more for each product.').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Preview packing' }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Save this packing' }).isDisabled(), true);
+    assert.equal(await page.getByText(/Total packs: 2/).count(), 0, 'An old packing summary must disappear for a negative count');
+    await laterCount.fill('1.5');
+    await page.getByText('Enter a whole pack count of zero or more for each product.').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Preview packing' }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Save this packing' }).isDisabled(), true);
+
+    await page.goto(`${web}/cooking/779`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Usable yield and packing' }).waitFor();
+    await page.locator('.cooking-actual-grid input[inputmode="decimal"]').first().fill('500');
+    const initialCount = page.locator('.cooking-pack-list input').first();
+    await initialCount.fill('-1');
+    await page.getByText('Enter a whole pack count of zero or more for each product.').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Preview packing' }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Save output' }).isDisabled(), true, 'Invalid initial packaging must block saving the usable yield');
+    await initialCount.fill('1.5');
+    await page.getByText('Enter a whole pack count of zero or more for each product.').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Save output' }).isDisabled(), true);
+    assert.deepEqual(mutationRequests, [], 'Invalid counts must never submit a result or packing mutation');
+
     workspace.capabilities.cooking_v1 = false;
     await page.goto(`${web}/recipes`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Calculate', exact: true }).click();
@@ -152,7 +181,7 @@ async function main() {
     const calculatorRows = await page.locator('.modal.show .list-group').innerText();
     assert.match(calculatorRows, /200(?:\.00)?\s*g/, `Expected reopened calculator to rescale from edited weight; got: ${calculatorRows}`);
     assert.deepEqual(errors, []);
-    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls }, pageErrors: errors.length }) + '\n');
+    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls }, blockedMutations: mutationRequests.length, pageErrors: errors.length }) + '\n');
   } finally {
     firstPlan.resolve(); firstPrep.resolve(); firstPacking.resolve();
     await context.close();

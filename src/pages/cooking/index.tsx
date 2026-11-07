@@ -133,12 +133,12 @@ const CookingHome = () => {
     const body = cookingRequestBody('new', 'create', operation_id => ({ ...input, title: title.trim() || t('cookingNewRun'), date: new Date().toISOString(), source_signature: preview.source_signature, stock_version: preview.stock_version, operation_id }), selectedWorkspaceId);
     try {
       const run = await api.createRun(body);
-      clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope);
+      clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope, body.operation_id);
       if (activeContext.current !== requestContext) return;
       setPendingCreate(false);
       await refreshRuns();
       router.push(`/cooking/${run.id}`);
-    } catch (cause) { if (operationWasRejected(cause)) { clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) setPendingCreate(false); } if (activeContext.current === requestContext) { if (operationErrorMessage(cause) === 'ambiguous') setPendingCreate(true); setError(operationErrorMessage(cause)); } }
+    } catch (cause) { if (operationWasRejected(cause)) { clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) setPendingCreate(false); } if (activeContext.current === requestContext) { if (operationErrorMessage(cause) === 'ambiguous') setPendingCreate(true); setError(operationErrorMessage(cause)); } }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
 
@@ -153,8 +153,8 @@ const CookingHome = () => {
     const body = cookingRequestBody('new', action, operation_id => ({ operation_id, stock_version: stock.version, kind: stockKind, reason: stockReason.trim(), quantity, ...(['initial', 'return'].includes(stockKind) ? (stockItemType === 'recipe' ? { recipe_id: stockRecipe || undefined } : { product_id: stockProduct || undefined }) : { lot_id: stockLot || undefined }) }), selectedWorkspaceId);
     try {
       await api.adjustStock(body);
-      clearCookingOperationId('new', action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) { setPendingStockAction(null); setStockQuantity(''); setStockReason(''); await refreshStock(); }
-    } catch (cause) { if (operationWasRejected(cause)) clearCookingOperationId('new', action, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) { if (operationWasRejected(cause)) setPendingStockAction(null); else if (operationErrorMessage(cause) === 'ambiguous') setPendingStockAction(action); setError(operationErrorMessage(cause)); } }
+      clearCookingOperationId('new', action, selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) { setPendingStockAction(null); setStockQuantity(''); setStockReason(''); await refreshStock(); }
+    } catch (cause) { if (operationWasRejected(cause)) clearCookingOperationId('new', action, selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) { if (operationWasRejected(cause)) setPendingStockAction(null); else if (operationErrorMessage(cause) === 'ambiguous') setPendingStockAction(action); setError(operationErrorMessage(cause)); } }
     finally { if (activeContext.current === requestContext) setBusy(false); }
   };
 
@@ -166,11 +166,11 @@ const CookingHome = () => {
     setBusy(true); setError('');
     try {
       const run = await api.createRun(body);
-      clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope);
+      clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope, body.operation_id);
       if (activeContext.current !== requestContext) return;
       setPendingCreate(false); await refreshRuns(); void router.push(`/cooking/${run.id}`);
     } catch (cause) {
-      if (operationWasRejected(cause)) { clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) setPendingCreate(false); }
+      if (operationWasRejected(cause)) { clearCookingOperationId('new', 'create', selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) setPendingCreate(false); }
       if (activeContext.current === requestContext) setError(operationErrorMessage(cause));
     } finally { if (activeContext.current === requestContext) setBusy(false); }
   };
@@ -184,10 +184,10 @@ const CookingHome = () => {
     setBusy(true); setError('');
     try {
       await api.adjustStock(body);
-      clearCookingOperationId('new', pendingStockAction, selectedWorkspaceId, operationScope);
+      clearCookingOperationId('new', pendingStockAction, selectedWorkspaceId, operationScope, body.operation_id);
       if (activeContext.current === requestContext) { setPendingStockAction(null); setStockQuantity(''); setStockReason(''); await refreshStock(); }
     } catch (cause) {
-      if (operationWasRejected(cause)) { clearCookingOperationId('new', pendingStockAction, selectedWorkspaceId, operationScope); if (activeContext.current === requestContext) setPendingStockAction(null); }
+      if (operationWasRejected(cause)) { clearCookingOperationId('new', pendingStockAction, selectedWorkspaceId, operationScope, body.operation_id); if (activeContext.current === requestContext) setPendingStockAction(null); }
       if (activeContext.current === requestContext) setError(operationErrorMessage(cause));
     } finally { if (activeContext.current === requestContext) setBusy(false); }
   };

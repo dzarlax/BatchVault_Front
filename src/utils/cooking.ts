@@ -66,9 +66,14 @@ export const cookingOperationId = (runId: number | 'new', action: string, worksp
   return next;
 };
 
-export const clearCookingOperationId = (runId: number | 'new', action: string, workspaceId?: string | null, capturedScope?: string) => {
+export const clearCookingOperationId = (runId: number | 'new', action: string, workspaceId: string | null | undefined, capturedScope: string | undefined, expectedOperationId: string) => {
   if (typeof window !== 'undefined') {
-    const key = scopedKey(runId, action, workspaceId, capturedScope || cookingOperationScope(workspaceId));
+    const scope = capturedScope || cookingOperationScope(workspaceId);
+    const key = scopedKey(runId, action, workspaceId, scope);
+    const current = readPendingRecord(key, scope);
+    const pending = readPendingRecord(`${key}:body`, scope);
+    const recordedId = pending?.body?.operation_id || current?.id;
+    if (!expectedOperationId || recordedId !== expectedOperationId || (current?.id && current.id !== expectedOperationId)) return;
     localStorage.removeItem(key);
     localStorage.removeItem(`${key}:body`);
     sessionStorage.removeItem(key);

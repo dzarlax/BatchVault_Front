@@ -645,6 +645,7 @@
   "cookingPackNow": "Pack now (optional)",
   "cookingPacks": "packs",
   "cookingPacksCount": "Pack count",
+  "cookingPackCountInvalid": "Enter a whole pack count of zero or more for each product.",
   "cookingPreviewPacking": "Preview packing",
   "cookingSaveResults": "Save output",
   "cookingTotalPacks": "Total packs",

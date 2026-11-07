@@ -645,6 +645,7 @@
   "cookingPackNow": "Упаковать сейчас (необязательно)",
   "cookingPacks": "уп.",
   "cookingPacksCount": "Количество упаковок",
+  "cookingPackCountInvalid": "Укажите для каждого товара целое количество упаковок, равное нулю или больше.",
   "cookingPreviewPacking": "Предпросмотр упаковки",
   "cookingSaveResults": "Сохранить выход",
   "cookingTotalPacks": "Всего упаковок",

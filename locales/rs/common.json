@@ -645,6 +645,7 @@
   "cookingPackNow": "Upakuj sada (opciono)",
   "cookingPacks": "pak.",
   "cookingPacksCount": "Broj pakovanja",
+  "cookingPackCountInvalid": "Za svaki proizvod unesite ceo broj pakovanja koji je nula ili veći.",
   "cookingPreviewPacking": "Prikaži pakovanje",
   "cookingSaveResults": "Sačuvaj prinos",
   "cookingTotalPacks": "Ukupno pakovanja",
