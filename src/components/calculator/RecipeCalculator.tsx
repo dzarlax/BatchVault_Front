@@ -15,24 +15,46 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
   const cookingEnabled = selectedWorkspace?.capabilities?.cooking_v1 === true;
   const ingredients = recipe?.recipe_ingredients || recipe?.ingredients || [];
   const baseOptions = ingredients.filter(item => item.ingredient?.type?.toLowerCase() === 'base' && isSupportedMassUnit(item.unit)).map(item => ({ value: item.id, label: `${item.ingredient?.name || t('unknownIngredient')} · ${item.quantity} ${item.unit}` }));
+  const recipeContentSignature = JSON.stringify([
+    recipe?.id,
+    recipe?.name,
+    recipe?.planned_yield_g,
+    ingredients.map(item => [item.id, item.recipe_id, item.ingredient_id, item.quantity, item.unit, item.ingredient?.name, item.ingredient?.type]).sort((a, b) => Number(a[0]) - Number(b[0])),
+  ]);
+  const recipeScopeSignature = JSON.stringify([selectedWorkspaceId, cookingEnabled, recipe?.id]);
   const [baseIngredientId, setBaseIngredientId] = useState<number | null>(null);
   const [baseWeight, setBaseWeight] = useState('');
   const [calculatedIngredients, setCalculatedIngredients] = useState<CalculatorRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState(false);
   const baseIngredient = ingredients.find(item => item.id === baseIngredientId) || null;
+  const currentRecipeData = useRef({ ingredients, baseOptions });
+  currentRecipeData.current = { ingredients, baseOptions };
   const multipleBaseOptions = baseOptions.length > 1;
-  const previewInput = JSON.stringify([show, selectedWorkspaceId, cookingEnabled, recipe?.id, baseIngredientId, parseDecimalInput(baseWeight)]);
+  const previewInput = JSON.stringify([show, selectedWorkspaceId, cookingEnabled, recipe?.id, recipeContentSignature, baseIngredientId, parseDecimalInput(baseWeight)]);
   const currentPreviewInput = useRef(previewInput);
   currentPreviewInput.current = previewInput;
+  const previousRecipe = useRef<{ scope: string; content: string } | null>(null);
 
   useEffect(() => {
-    setBaseIngredientId(baseOptions.length === 1 ? baseOptions[0].value : null);
-    const initialBase = baseOptions.length === 1 ? ingredients.find(item => item.id === baseOptions[0].value) : null;
-    setBaseWeight(initialBase ? normalizeMassQuantityToGrams(initialBase.quantity, initialBase.unit) || '' : '');
-    setCalculatedIngredients(cookingEnabled ? [] : ingredients);
+    const previous = previousRecipe.current;
+    if (previous?.scope === recipeScopeSignature && previous.content === recipeContentSignature) return;
+    const sameRecipe = previous?.scope === recipeScopeSignature;
+    previousRecipe.current = { scope: recipeScopeSignature, content: recipeContentSignature };
+
+    const currentIngredients = currentRecipeData.current.ingredients;
+    const currentBaseOptions = currentRecipeData.current.baseOptions;
+    const currentSelectionIsValid = sameRecipe && currentBaseOptions.some(option => option.value === baseIngredientId);
+    const nextBaseId = currentSelectionIsValid ? baseIngredientId : currentBaseOptions.length === 1 ? currentBaseOptions[0].value : null;
+    const selectedBase = currentIngredients.find(item => item.id === nextBaseId);
+    setBaseIngredientId(nextBaseId);
+    if (!currentSelectionIsValid || !sameRecipe) {
+      setBaseWeight(selectedBase ? normalizeMassQuantityToGrams(selectedBase.quantity, selectedBase.unit) || '' : '');
+    }
+    setCalculatedIngredients(cookingEnabled ? [] : currentIngredients);
     setServerError(false);
-  }, [recipe?.id, cookingEnabled]);
+    setLoading(false);
+  }, [recipeScopeSignature, recipeContentSignature, baseIngredientId, baseWeight, cookingEnabled]);
 
   useEffect(() => {
     setLoading(false);

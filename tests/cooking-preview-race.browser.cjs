@@ -13,6 +13,8 @@ const recipe = {
     { id: 312, recipe_id: 31, ingredient_id: 42, quantity: '100', unit: 'g', ingredient: { id: 42, name: 'QA spice', type: 'spice', unit: 'g' } },
   ],
 };
+let recipeFixture = recipe;
+let recipeFetches = 0;
 const product = { id: 51, name: 'QA 100 g pack', product_type: 'standard', package_id: 61, net_weight_g: '100', package: { id: 61, name: '100 g', net_weight_g: '100' }, recipe_id: 31, price: 100, cost: 50 };
 const order = { id: 104, client_id: 1, client: { id: 1, name: 'QA Client' }, status: 'new', items: [{ id: 1, product_id: 51, quantity: 1, price: 100, cost_price: 50 }] };
 const makeFlavor = name => ({ recipe_id: 31, name, target_finished_g: '100', suggested_meat_g: '200', base_recipe_ingredient_id: 311, recipe_snapshot: { ingredients: [{ recipe_ingredient_id: 311, name: 'QA base meat', type: 'base', quantity: '1', unit: 'kg' }] }, issues: [] });
@@ -49,6 +51,7 @@ async function main() {
   const firstPacking = deferred();
   let planCalls = 0;
   let prepCalls = 0;
+  const calculatorPreviewBodies = [];
   let packingCalls = 0;
   let resolvePlanStarted;
   let resolvePrepStarted;
@@ -67,7 +70,7 @@ async function main() {
     else if (pathName === '/api/workspaces/current') result = workspace;
     else if (pathName === '/api/orders') result = [order];
     else if (pathName === '/api/products') result = [product];
-    else if (pathName === '/api/recipes') result = [recipe];
+    else if (pathName === '/api/recipes') { recipeFetches++; result = [recipeFixture]; }
     else if (pathName === '/api/workspace-ingredients') result = [];
     else if (pathName === '/api/cooking-runs') result = { items: [], next_cursor: null };
     else if (pathName === '/api/cooking-stock') result = { version: 1, lots: [], events: [] };
@@ -80,6 +83,7 @@ async function main() {
       else result = planPreview('Fresh preview');
     } else if (pathName === '/api/cooking/preparation-preview' && method === 'POST') {
       prepCalls++;
+      calculatorPreviewBodies.push(request.postDataJSON());
       if (prepCalls === 1) { resolvePrepStarted(); await firstPrep.promise; result = { ...cookingRun(777, 'prepared').preparation, flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '200', ingredients: [{ ingredient_id: 42, recipe_ingredient_id: 312, name: 'Old marinade', quantity: '9', unit: 'g' }] }] }; }
       else result = { ...cookingRun(777, 'prepared').preparation, flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '300', ingredients: [{ ingredient_id: 42, recipe_ingredient_id: 312, name: 'Fresh marinade', quantity: '12', unit: 'g' }] }] };
     } else if (pathName === '/api/cooking-runs/778/packing-preview' && method === 'POST') {
@@ -211,19 +215,42 @@ async function main() {
     assert.equal(await page.getByLabel(/Recipe base weight/).inputValue(), '2000');
     assert.equal(await page.locator('.modal.show .list-group-item').count(), 0, 'Server mode must clear stale rows on reopen until a fresh preview');
 
+    await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+    recipeFixture = {
+      ...recipeFixture,
+      recipe_ingredients: [
+        { id: 313, recipe_id: 31, ingredient_id: 43, quantity: '2', unit: 'kg', ingredient: { id: 43, name: 'QA replacement meat', type: 'base', unit: 'kg' } },
+        recipeFixture.recipe_ingredients[1],
+      ],
+    };
+    await page.waitForTimeout(5500);
+    const recipeRefresh = page.waitForResponse(response => new URL(response.url()).pathname === '/api/recipes');
+    await page.bringToFront();
+    await page.evaluate(() => { window.dispatchEvent(new Event('blur')); window.dispatchEvent(new Event('focus')); });
+    await recipeRefresh;
+    await page.waitForFunction(() => document.body.innerText.includes('QA replacement meat'));
+    await page.getByRole('button', { name: 'Calculate', exact: true }).click();
+    const replacementWeight = page.getByLabel(/Recipe base weight/);
+    await replacementWeight.waitFor();
+    assert.equal(await replacementWeight.inputValue(), '2000', 'A unique replacement base should be selected and normalized to grams');
+    assert.equal(await page.locator('.modal.show .list-group-item').count(), 0, 'Recipe-content refresh must clear the old server preview');
+    await page.getByRole('button', { name: 'Calculate marinade' }).click();
+    await page.getByText('Fresh marinade').waitFor();
+    assert.equal(calculatorPreviewBodies.at(-1).flavors[0].base_recipe_ingredient_id, 313, 'A preview after same-ID recipe refresh must use the replacement base row');
+
     workspace.capabilities.cooking_v1 = false;
     await page.goto(`${web}/recipes`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Calculate', exact: true }).click();
     const weight = page.getByLabel(/Recipe base weight/);
-    await weight.fill('2000');
+    await weight.fill('4000');
     await page.getByRole('button', { name: 'Close', exact: true }).last().click();
     await page.getByRole('button', { name: 'Calculate', exact: true }).click();
     await page.locator('.modal.show').waitFor({ state: 'visible' });
-    assert.equal(await page.getByLabel(/Recipe base weight/).inputValue(), '2000');
+    assert.equal(await page.getByLabel(/Recipe base weight/).inputValue(), '4000');
     const calculatorRows = await page.locator('.modal.show .list-group').innerText();
     assert.match(calculatorRows, /200(?:\.00)?\s*g/, `Expected reopened calculator to rescale from edited weight; got: ${calculatorRows}`);
     assert.deepEqual(errors, []);
-    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'create-and-stock-journal-quota-failures-release-busy-without-writing', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'server-calculator-clears-stale-rows-on-reopen', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls }, blockedMutations: mutationRequests.length, pageErrors: errors.length }) + '\n');
+    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'create-and-stock-journal-quota-failures-release-busy-without-writing', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'server-calculator-clears-stale-rows-on-reopen', 'same-id-recipe-content-refresh-reconciles-replacement-base', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls, recipeFetches }, blockedMutations: mutationRequests.length, pageErrors: errors.length }) + '\n');
   } finally {
     firstPlan.resolve(); firstPrep.resolve(); firstPacking.resolve();
     await context.close();
