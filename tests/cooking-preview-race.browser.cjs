@@ -18,12 +18,17 @@ let recipeFetches = 0;
 const product = { id: 51, name: 'QA 100 g pack', product_type: 'standard', package_id: 61, net_weight_g: '100', package: { id: 61, name: '100 g', net_weight_g: '100' }, recipe_id: 31, price: 100, cost: 50 };
 const order = { id: 104, client_id: 1, client: { id: 1, name: 'QA Client' }, status: 'new', items: [{ id: 1, product_id: 51, quantity: 1, price: 100, cost_price: 50 }] };
 const makeFlavor = name => ({ recipe_id: 31, name, target_finished_g: '100', suggested_meat_g: '200', base_recipe_ingredient_id: 311, recipe_snapshot: { ingredients: [{ recipe_ingredient_id: 311, name: 'QA base meat', type: 'base', quantity: '1', unit: 'kg' }] }, issues: [] });
+const zeroIdIngredients = [
+  { ingredient_id: 42, recipe_ingredient_id: 0, name: 'Same ingredient grams', quantity: '12', unit: 'g', type: 'spice' },
+  { ingredient_id: 42, recipe_ingredient_id: 0, name: 'Same ingredient millilitres', quantity: '8', unit: 'ml', type: 'spice' },
+  { ingredient_id: 42, recipe_ingredient_id: 0, name: 'Same ingredient base grams', quantity: '3', unit: 'g', type: 'base' },
+];
 const planPreview = name => ({ plan: { flavors: [makeFlavor(name)], products: [{ id: product.id, name: product.name, net_weight_g: '100' }], issues: [] }, source_signature: name, stock_version: 1, active_runs: [], stock: { version: 1, lots: [] } });
 const cookingRun = (id, state) => ({
   id, title: `QA ${state} run`, date: '2026-11-07T10:00:00Z', state, version: 1, source_signature: 'qa', stock_version: 1,
   plan_input: { order_ids: [104], extras: [] },
   plan: { flavors: [makeFlavor('QA test recipe')], products: [{ id: product.id, name: product.name, net_weight_g: '100' }], issues: [] },
-  preparation: state === 'prepared' || state === 'cooked' ? { prepared_meat_g: '200', allocated_meat_g: '200', unallocated_meat_g: '0', flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '200', ingredients: [] }], ingredients_total: [] } : null,
+  preparation: state === 'prepared' || state === 'cooked' ? { prepared_meat_g: '200', allocated_meat_g: '200', unallocated_meat_g: '0', flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '200', ingredients: zeroIdIngredients }], ingredients_total: zeroIdIngredients } : null,
   actual_output: state === 'cooked' ? [{ recipe_id: 31, quantity_g: '500', name: 'QA test recipe' }] : [], lots: [], events: [], order_changes: [],
 });
 
@@ -60,6 +65,7 @@ async function main() {
   const prepStarted = new Promise(resolve => { resolvePrepStarted = resolve; });
   const packingStarted = new Promise(resolve => { resolvePackingStarted = resolve; });
   const errors = [];
+  const duplicateKeyWarnings = [];
   await context.route(`${api}/**`, async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -83,9 +89,10 @@ async function main() {
       else result = planPreview('Fresh preview');
     } else if (pathName === '/api/cooking/preparation-preview' && method === 'POST') {
       prepCalls++;
-      calculatorPreviewBodies.push(request.postDataJSON());
+      const previewBody = request.postDataJSON();
+      calculatorPreviewBodies.push(previewBody);
       if (prepCalls === 1) { resolvePrepStarted(); await firstPrep.promise; result = { ...cookingRun(777, 'prepared').preparation, flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '200', ingredients: [{ ingredient_id: 42, recipe_ingredient_id: 312, name: 'Old marinade', quantity: '9', unit: 'g' }] }] }; }
-      else result = { ...cookingRun(777, 'prepared').preparation, flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '300', ingredients: [{ ingredient_id: 42, recipe_ingredient_id: 312, name: 'Fresh marinade', quantity: '12', unit: 'g' }] }] };
+      else result = { ...cookingRun(777, 'prepared').preparation, flavors: [{ ...makeFlavor('QA test recipe'), actual_meat_g: '300', ingredients: previewBody.flavors?.[0]?.base_recipe_ingredient_id === 313 ? zeroIdIngredients : [{ ingredient_id: 42, recipe_ingredient_id: 312, name: 'Fresh marinade', quantity: '12', unit: 'g', type: 'spice' }] }] };
     } else if (pathName === '/api/cooking-runs/778/packing-preview' && method === 'POST') {
       packingCalls++;
       if (packingCalls === 1) { resolvePackingStarted(); await firstPacking.promise; result = { total_packs: 1, consumption: [], remaining: [] }; }
@@ -99,6 +106,7 @@ async function main() {
     if (request.method() === 'POST' && (/\/api\/cooking-runs(?:\/779\/results|\/778\/packings)$/.test(new URL(request.url()).pathname) || new URL(request.url()).pathname === '/api/cooking-runs' || new URL(request.url()).pathname === '/api/cooking-stock/adjustments')) mutationRequests.push(new URL(request.url()).pathname);
   });
   page.on('pageerror', error => errors.push(error.name));
+  page.on('console', message => { if (message.type() === 'error' && /same key|unique "key"/i.test(message.text())) duplicateKeyWarnings.push(message.text()); });
   await page.addInitScript(() => {
     const token = ['eyJhbGciOiJIUzI1NiJ9', btoa(JSON.stringify({ userID: 7, exp: Math.floor(Date.now() / 1000) + 3600 })).replace(/=/g, ''), 'fixture'].join('.');
     localStorage.setItem('token', token);
@@ -192,6 +200,8 @@ async function main() {
 
     await page.goto(`${web}/cooking/779`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Usable yield and packing' }).waitFor();
+    assert.equal(await page.locator('.cooking-marinade .cooking-stock-row').count(), 3, 'Combined ingredient rows with zero recipe-row IDs must render distinctly');
+    assert.deepEqual(duplicateKeyWarnings, [], 'Cooking detail ingredient lists must not produce duplicate React key warnings');
     await page.locator('.cooking-actual-grid input[inputmode="decimal"]').first().fill('500');
     const initialCount = page.locator('.cooking-pack-list input').first();
     await initialCount.fill('-1');
@@ -235,8 +245,10 @@ async function main() {
     assert.equal(await replacementWeight.inputValue(), '2000', 'A unique replacement base should be selected and normalized to grams');
     assert.equal(await page.locator('.modal.show .list-group-item').count(), 0, 'Recipe-content refresh must clear the old server preview');
     await page.getByRole('button', { name: 'Calculate marinade' }).click();
-    await page.getByText('Fresh marinade').waitFor();
+    await page.getByText('Same ingredient grams').waitFor();
+    assert.equal(await page.locator('.modal.show .list-group-item').count(), 3, 'Zero recipe-row IDs must not collapse server calculation rows with distinct ingredient grouping dimensions');
     assert.equal(calculatorPreviewBodies.at(-1).flavors[0].base_recipe_ingredient_id, 313, 'A preview after same-ID recipe refresh must use the replacement base row');
+    assert.deepEqual(duplicateKeyWarnings, [], 'Server calculation rows must not produce duplicate React key warnings');
 
     workspace.capabilities.cooking_v1 = false;
     await page.goto(`${web}/recipes`, { waitUntil: 'domcontentloaded' });
@@ -250,7 +262,7 @@ async function main() {
     const calculatorRows = await page.locator('.modal.show .list-group').innerText();
     assert.match(calculatorRows, /200(?:\.00)?\s*g/, `Expected reopened calculator to rescale from edited weight; got: ${calculatorRows}`);
     assert.deepEqual(errors, []);
-    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'create-and-stock-journal-quota-failures-release-busy-without-writing', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'server-calculator-clears-stale-rows-on-reopen', 'same-id-recipe-content-refresh-reconciles-replacement-base', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls, recipeFetches }, blockedMutations: mutationRequests.length, pageErrors: errors.length }) + '\n');
+    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'create-and-stock-journal-quota-failures-release-busy-without-writing', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'server-calculator-clears-stale-rows-on-reopen', 'same-id-recipe-content-refresh-reconciles-replacement-base', 'zero-recipe-row-id-ingredient-keys', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls, recipeFetches }, blockedMutations: mutationRequests.length, pageErrors: errors.length, duplicateKeyWarnings: duplicateKeyWarnings.length }) + '\n');
   } finally {
     firstPlan.resolve(); firstPrep.resolve(); firstPacking.resolve();
     await context.close();

@@ -7,7 +7,8 @@ import { useWorkspace } from '../../utils/workspaceContext';
 import { cookingApiFor, isSupportedMassUnit, normalizeMassQuantityToGrams, parseDecimalInput } from '../../utils/cooking';
 
 interface RecipeCalculatorProps { show: boolean; onHide: () => void; recipe: Recipe; t: (key: string) => string }
-type CalculatorRow = { id: number; quantity: string; unit: string; ingredient?: { name: string } };
+type CalculatorRow = { id: number; ingredient_id?: number; type?: string; quantity: string; unit: string; ingredient?: { name: string } };
+const calculatorRowKey = (item: CalculatorRow) => JSON.stringify([item.ingredient_id, item.id, item.unit, item.type || '']);
 
 const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recipe, t }) => {
   const titleId = `recipe-calculator-modal-title-${useId()}`;
@@ -82,7 +83,7 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
       const result: any = await cookingApiFor(selectedWorkspaceId).preparationPreview(body);
       if (currentPreviewInput.current !== requestInput) return;
       const flavor = result.flavors?.[0];
-      setCalculatedIngredients((flavor?.ingredients || []).map((item: any) => ({ id: item.recipe_ingredient_id, quantity: item.quantity, unit: item.unit, ingredient: { name: item.name } })));
+      setCalculatedIngredients((flavor?.ingredients || []).map((item: any) => ({ id: item.recipe_ingredient_id, ingredient_id: item.ingredient_id, type: item.type, quantity: item.quantity, unit: item.unit, ingredient: { name: item.name } })));
     } catch { if (currentPreviewInput.current === requestInput) setServerError(true); }
     finally { if (currentPreviewInput.current === requestInput) setLoading(false); }
   };
@@ -97,7 +98,7 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
       {baseIngredient && <Form.Group className="mb-3" controlId={`${titleId}-base-weight`}><Form.Label>{t('recipeCalculatorBaseWeight')}: <strong>{baseIngredient.ingredient?.name || t('unknownIngredient')}</strong></Form.Label><Form.Control inputMode="decimal" value={baseWeight} onChange={event => { setBaseWeight(event.target.value); if (cookingEnabled) setCalculatedIngredients([]); setServerError(false); setLoading(false); }} placeholder={t('enterNewWeight')} /></Form.Group>}
       {cookingEnabled && <div className="d-flex justify-content-end mb-3"><Button disabled={loading || !baseIngredientId || !parseDecimalInput(baseWeight)} onClick={() => void previewOnServer()}>{loading ? <Spinner size="sm" className="me-2" /> : null}{t('cookingPreviewMarinade')}</Button></div>}
       {serverError && <Alert variant="danger" role="alert">{t('cookingPreparationPreviewError')}</Alert>}
-      <ListGroup>{calculatedIngredients.map(ingredient => <ListGroup.Item key={ingredient.id}><div className="d-flex justify-content-between align-items-center"><span>{ingredient.ingredient?.name || t('unknownIngredient')}</span><span>{ingredient.quantity} {ingredient.unit}</span></div></ListGroup.Item>)}</ListGroup>
+      <ListGroup>{calculatedIngredients.map(ingredient => <ListGroup.Item key={calculatorRowKey(ingredient)}><div className="d-flex justify-content-between align-items-center"><span>{ingredient.ingredient?.name || t('unknownIngredient')}</span><span>{ingredient.quantity} {ingredient.unit}</span></div></ListGroup.Item>)}</ListGroup>
     </Modal.Body>
     <Modal.Footer><Button variant="secondary" onClick={onHide}>{t('close')}</Button></Modal.Footer>
   </Modal>;
