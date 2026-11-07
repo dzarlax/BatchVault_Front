@@ -13,9 +13,10 @@ interface ProductCardProps {
   packages: ProductPackage[];
   onEdit: (product: Product) => void;
   editDisabled?: boolean;
+  stock?: { total: number; reserved: number; available: number };
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, recipes, packages, onEdit, editDisabled = false }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, recipes, packages, onEdit, editDisabled = false, stock }) => {
   const { t } = useTranslation('common');
   const { selectedCurrency } = useWorkspace();
   const currentCost = effectiveProductCost(product);
@@ -43,6 +44,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, recipes, packages, o
       <div className="product-card-primary-metrics">
         <span>{t('margin')}: {profitMargin == null ? t('costingUnavailable') : `${profitMargin}%`}</span>
       </div>
+
+      {stock && <div className="product-card-primary-metrics" aria-label={t('cookingStock')}>
+        <span>{t('cookingStockTotal')}: <strong>{stock.total}</strong></span>
+        <span>{t('cookingStockReserved')}: <strong>{stock.reserved}</strong></span>
+        <span>{t('cookingStockAvailable')}: <strong>{stock.available}</strong></span>
+      </div>}
 
       <details className="product-card-details">
         <summary>{t('productDetails')}</summary>

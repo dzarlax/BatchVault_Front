@@ -125,7 +125,7 @@ export interface Ingredient {
 }
 
 export interface Workspace {
-  capabilities?: { product_types_v1?: boolean };
+  capabilities?: { product_types_v1?: boolean; cooking_v1?: boolean };
   id: number;
   name: string;
   slug: string;

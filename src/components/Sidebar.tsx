@@ -19,7 +19,8 @@ import {
   FaGlobe,
   FaIndustry,
   FaStore,
-  FaBriefcase
+  FaBriefcase,
+  FaFire
 } from 'react-icons/fa';
 import { useAuth } from '../utils/authContext';
 import { useWorkspace } from '../utils/workspaceContext';
@@ -135,6 +136,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span>{t('ingredients')}</span>
           </Nav.Link>
         </Link>
+
+        {selectedWorkspace?.capabilities?.cooking_v1 === true && <Link href="/cooking" locale={lang} passHref legacyBehavior>
+          <Nav.Link className={`sidebar-link ${router.pathname.startsWith('/cooking') ? 'active' : ''}`} onClick={isMobile ? onClose : undefined}>
+            <FaFire className="sidebar-link-icon" /><span>{t('cookingTitle')}</span>
+          </Nav.Link>
+        </Link>}
 
         <Link href="/prices" locale={lang} passHref legacyBehavior>
           <Nav.Link
