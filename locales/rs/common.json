@@ -631,6 +631,7 @@
   "cookingConflict": "Podaci na serveru su promenjeni. Unosi su sačuvani; osvežite podatke pre ponovnog čuvanja.",
   "cookingAmbiguous": "Ishod zahteva nije jasan. Ostavite obrazac otvoren i pokušajte ponovo sa istim ID-om operacije.",
   "cookingSaveError": "Nije moguće sačuvati ovaj korak pripreme.",
+  "cookingJournalError": "Pregledač nije mogao da sačuva ovu radnju. Zahtev nije poslat. Oslobodite prostor u pregledaču i pokušajte ponovo.",
   "cookingVersion": "Verzija {{version}}",
   "cookingOrderChanged": "Porudžbina je promenjena nakon kreiranja plana.",
   "cookingActualMeat": "Glavni sastojak i marinada",

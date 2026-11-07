@@ -92,7 +92,7 @@ async function main() {
   const page = await context.newPage();
   const mutationRequests = [];
   page.on('request', request => {
-    if (request.method() === 'POST' && /\/api\/cooking-runs\/(?:779\/results|778\/packings)$/.test(new URL(request.url()).pathname)) mutationRequests.push(new URL(request.url()).pathname);
+    if (request.method() === 'POST' && (/\/api\/cooking-runs(?:\/779\/results|\/778\/packings)$/.test(new URL(request.url()).pathname) || new URL(request.url()).pathname === '/api/cooking-runs' || new URL(request.url()).pathname === '/api/cooking-stock/adjustments')) mutationRequests.push(new URL(request.url()).pathname);
   });
   page.on('pageerror', error => errors.push(error.name));
   await page.addInitScript(() => {
@@ -119,6 +119,36 @@ async function main() {
     await page.getByRole('button', { name: 'Preview plan' }).click();
     await page.getByText('Fresh preview').waitFor();
     await page.getByRole('button', { name: 'Start cooking run' }).waitFor();
+
+    const blockJournalWrites = () => page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      window.__restoreJournalStorage = () => { Storage.prototype.setItem = original; };
+      Storage.prototype.setItem = function (key, value) {
+        if (String(key).startsWith('cooking:operation:')) throw new DOMException('Quota exceeded', 'QuotaExceededError');
+        return original.call(this, key, value);
+      };
+    });
+    const restoreJournalWrites = () => page.evaluate(() => window.__restoreJournalStorage?.());
+    await blockJournalWrites();
+    await page.getByRole('button', { name: 'Start cooking run' }).click();
+    await page.getByText('Your browser could not save this action. No request was sent. Free browser storage and try again.').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Start cooking run' }).isEnabled(), true, 'Journal failure must release the create button');
+    assert.equal(await page.getByText('A create request has an unresolved outcome. Retry the exact saved request before changing this plan.').count(), 0, 'Journal failure must not create a pending operation without a saved body');
+    assert.deepEqual(mutationRequests, [], 'Create must not be sent if its retry body cannot be journaled');
+    await restoreJournalWrites();
+
+    const adjustment = page.locator('.cooking-stock-adjustment');
+    await adjustment.getByRole('combobox', { name: 'Recipe', exact: true }).click();
+    await page.getByRole('option', { name: 'QA test recipe', exact: true }).click();
+    await adjustment.locator('input[inputmode="decimal"]').fill('1000');
+    await adjustment.locator('.cooking-stock-form input').last().fill('QA initial stock');
+    await blockJournalWrites();
+    await adjustment.getByRole('button', { name: 'Save adjustment' }).click();
+    await page.getByText('Your browser could not save this action. No request was sent. Free browser storage and try again.').waitFor();
+    assert.equal(await adjustment.getByRole('button', { name: 'Save adjustment' }).isEnabled(), true, 'Journal failure must release the stock adjustment button');
+    assert.equal(await page.getByText('A stock change has an unresolved outcome. Retry the exact saved request before editing stock.').count(), 0, 'Journal failure must not create a pending stock action without a saved body');
+    assert.deepEqual(mutationRequests, [], 'Stock adjustment must not be sent if its retry body cannot be journaled');
+    await restoreJournalWrites();
 
     await page.goto(`${web}/cooking/777`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Main ingredient and marinade' }).waitFor();
@@ -169,6 +199,18 @@ async function main() {
     assert.equal(await page.getByRole('button', { name: 'Save output' }).isDisabled(), true);
     assert.deepEqual(mutationRequests, [], 'Invalid counts must never submit a result or packing mutation');
 
+    await page.goto(`${web}/recipes`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Calculate', exact: true }).click();
+    const serverWeight = page.getByLabel(/Recipe base weight/);
+    await serverWeight.fill('2000');
+    await page.getByRole('button', { name: 'Calculate marinade' }).click();
+    await page.getByText('Fresh marinade').waitFor();
+    await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+    await page.getByRole('button', { name: 'Calculate', exact: true }).click();
+    await page.locator('.modal.show').waitFor({ state: 'visible' });
+    assert.equal(await page.getByLabel(/Recipe base weight/).inputValue(), '2000');
+    assert.equal(await page.locator('.modal.show .list-group-item').count(), 0, 'Server mode must clear stale rows on reopen until a fresh preview');
+
     workspace.capabilities.cooking_v1 = false;
     await page.goto(`${web}/recipes`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Calculate', exact: true }).click();
@@ -181,7 +223,7 @@ async function main() {
     const calculatorRows = await page.locator('.modal.show .list-group').innerText();
     assert.match(calculatorRows, /200(?:\.00)?\s*g/, `Expected reopened calculator to rescale from edited weight; got: ${calculatorRows}`);
     assert.deepEqual(errors, []);
-    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls }, blockedMutations: mutationRequests.length, pageErrors: errors.length }) + '\n');
+    process.stdout.write(JSON.stringify({ result: 'passed', checks: ['late-plan-response-discarded-after-extras-edit', 'create-and-stock-journal-quota-failures-release-busy-without-writing', 'late-preparation-response-discarded-after-weight-edit', 'later-pack-preview-invalidated-after-count-edit', 'negative-and-fractional-pack-counts-block-preview-and-save', 'server-calculator-clears-stale-rows-on-reopen', 'legacy-calculator-recomputes-on-reopen'], calls: { planCalls, prepCalls, packingCalls }, blockedMutations: mutationRequests.length, pageErrors: errors.length }) + '\n');
   } finally {
     firstPlan.resolve(); firstPrep.resolve(); firstPacking.resolve();
     await context.close();

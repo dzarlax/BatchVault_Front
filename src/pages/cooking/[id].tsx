@@ -10,7 +10,7 @@ import SelectDropdown from '../../components/SelectDropdown';
 import { useAuth, withAuth } from '../../utils/authContext';
 import { useWorkspace } from '../../utils/workspaceContext';
 import { workspaceFetcher, workspaceKey } from '../../utils/workspaceSWR';
-import { cookingApiFor, cookingRequestBody, cookingOperationScope, cookingOperationId, clearCookingOperationId, displayGrams, operationErrorMessage, operationWasRejected, parseDecimalInput, getCookingPendingBody, hasBaseSelectionIssue } from '../../utils/cooking';
+import { cookingApiFor, cookingRequestBody, cookingOperationScope, clearCookingOperationId, displayGrams, operationErrorMessage, operationWasRejected, parseDecimalInput, getCookingPendingBody, hasBaseSelectionIssue } from '../../utils/cooking';
 import type { CookingPackingLine, CookingRun, CookingStock } from '../../types/cooking';
 
 const CookingRunPage = () => {
@@ -118,19 +118,35 @@ const CookingRunPage = () => {
   const prepPreviewIsCurrent = Boolean(prepPreview && prepPreviewFingerprint.current === currentPrepFingerprint);
   const packPreviewIsCurrent = Boolean(packPreview && packingPreviewFingerprint.current === currentPackingFingerprint);
   const laterPreviewIsCurrent = Boolean(laterPreview && laterPreviewFingerprint.current === currentLaterFingerprint);
-  const perform = async (action: string, call: (operationId: string) => Promise<unknown>, refresh = true) => {
+  const perform = async (action: string, buildBody: (operationId: string) => any, call: (body: any) => Promise<unknown>, refresh = true) => {
     if (pendingRecovery) return;
     const requestContext = contextKey;
     const operationScope = cookingOperationScope(selectedWorkspaceId);
     setBusy(true); setErrorKey('');
-    const operationId = cookingOperationId(id, action, selectedWorkspaceId);
-    try { await call(operationId); clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, operationId); if (activeContext.current !== requestContext) return; if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; } if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; } if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; } if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); } if (refresh) { await mutate(); await refreshStock(); setPendingRecovery(null); if (action === 'preparation') setEditingPreparation(false); } }
+    let body: any;
+    let requestStarted = false;
+    try {
+      body = cookingRequestBody(id, action, buildBody, selectedWorkspaceId);
+      requestStarted = true;
+      await call(body);
+      clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, body.operation_id);
+      if (activeContext.current !== requestContext) return;
+      if (action === 'preparation') { setPrepPreview(null); prepPreviewFingerprint.current = null; }
+      if (action === 'results') { setPackPreview(null); packingPreviewFingerprint.current = null; }
+      if (action === 'packing') { setLaterPreview(null); laterPreviewFingerprint.current = null; }
+      if (action === 'replan') { setReplanPreview(null); replanPreviewFingerprint.current = null; setReplanPreviewDirty(false); }
+      if (refresh) { await mutate(); await refreshStock(); setPendingRecovery(null); if (action === 'preparation') setEditingPreparation(false); }
+    }
     catch (cause) {
+      if (!requestStarted) {
+        if (activeContext.current === requestContext) setErrorKey('journal');
+        return;
+      }
       const outcome = operationErrorMessage(cause);
-      if (operationWasRejected(cause)) clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, operationId);
+      if (operationWasRejected(cause)) clearCookingOperationId(id, action, selectedWorkspaceId, operationScope, body.operation_id);
       if (activeContext.current === requestContext) {
         if (operationWasRejected(cause)) setPendingRecovery(null);
-        if (outcome === 'ambiguous') setPendingRecovery({ action, body: getCookingPendingBody(id, action, selectedWorkspaceId) });
+        if (outcome === 'ambiguous') setPendingRecovery({ action, body: getCookingPendingBody(id, action, selectedWorkspaceId) || body });
         setErrorKey(outcome);
       }
     }
@@ -151,8 +167,7 @@ const CookingRunPage = () => {
   const savePreparation = () => {
     if (!canStartFreshMutation()) return;
     if (!prepPreviewIsCurrent) return;
-    const body = cookingRequestBody(id, 'preparation', operation_id => ({ ...prepBody(), operation_id }), selectedWorkspaceId);
-    return perform('preparation', () => api.savePreparation(id, body));
+    return perform('preparation', operation_id => ({ ...prepBody(), operation_id }), body => api.savePreparation(id, body));
   };
   const previewPacking = async () => {
     if (!initialPackCountsValid) return;
@@ -169,8 +184,7 @@ const CookingRunPage = () => {
     if (!canStartFreshMutation()) return;
     if (!initialPackCountsValid) return;
     if (initialPackLines.length && !packPreviewIsCurrent) return;
-    const body = cookingRequestBody(id, 'results', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, actual_usable_g: outputLines, ...(initialPackLines.length ? { packing: { lines: initialPackLines } } : {}) }), selectedWorkspaceId);
-    return perform('results', () => api.results(id, body));
+    return perform('results', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, actual_usable_g: outputLines, ...(initialPackLines.length ? { packing: { lines: initialPackLines } } : {}) }), body => api.results(id, body));
   };
   const previewLater = async () => {
     if (!laterPackCountsValid) return;
@@ -187,13 +201,11 @@ const CookingRunPage = () => {
     if (!canStartFreshMutation()) return;
     if (!laterPackCountsValid) return;
     if (!laterPreviewIsCurrent) return;
-    const body = cookingRequestBody(id, 'packing', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, lines: laterPackingLines }), selectedWorkspaceId);
-    return perform('packing', () => api.pack(id, body));
+    return perform('packing', operation_id => ({ version: run!.version, stock_version: run!.stock_version, operation_id, lines: laterPackingLines }), body => api.pack(id, body));
   };
   const archive = () => {
     if (!canStartFreshMutation()) return;
-    const body = cookingRequestBody(id, 'archive', operation_id => ({ version: run!.version, operation_id }), selectedWorkspaceId);
-    return perform('archive', () => api.archive(id, body));
+    return perform('archive', operation_id => ({ version: run!.version, operation_id }), body => api.archive(id, body));
   };
 
   const previewReplan = async () => {
@@ -215,8 +227,7 @@ const CookingRunPage = () => {
     if (!run || !replanPreview || replanPreviewDirty || replanPreviewFingerprint.current !== currentReplanFingerprint || !run.plan_input) return;
     const planInput = replanPlanInput;
     if (!planInput) return;
-    const body = cookingRequestBody(id, 'replan', operation_id => ({ ...planInput, title: run.title, date: run.date, source_signature: replanPreview.source_signature, stock_version: replanPreview.stock_version, version: run.version, operation_id }), selectedWorkspaceId);
-    return perform('replan', () => api.replan(id, body));
+    return perform('replan', operation_id => ({ ...planInput, title: run.title, date: run.date, source_signature: replanPreview.source_signature, stock_version: replanPreview.stock_version, version: run.version, operation_id }), body => api.replan(id, body));
   };
 
   const retryPending = async () => {
@@ -246,7 +257,7 @@ const CookingRunPage = () => {
   return <div className="page-container cooking-page">
     <div className="cooking-backline"><Button variant="link" onClick={() => void router.push('/cooking')}><FaArrowLeft className="me-2" />{t('cookingTitle')}</Button><span className={`cooking-state cooking-state-${run.state}`}>{t(`cookingState_${run.state}`)}</span></div>
     <header className="page-header"><div><h1 className="page-title">{run.title}</h1><p className="page-subtitle">#{run.id} · {new Date(run.date).toLocaleDateString(router.locale)} · {t('cookingVersion', { version: run.version })}</p></div><Button variant="outline-secondary" onClick={() => void refreshRun()}><FaSync className="me-2" />{t('refresh')}</Button></header>
-    {errorKey && <Alert variant={errorKey === 'conflict' ? 'warning' : 'danger'} role="alert">{t(errorKey === 'conflict' ? 'cookingConflict' : errorKey === 'ambiguous' ? 'cookingAmbiguous' : 'cookingSaveError')} <Button size="sm" variant="outline-secondary" onClick={() => void refreshRun()}>{t('refresh')}</Button></Alert>}
+    {errorKey && <Alert variant={errorKey === 'conflict' ? 'warning' : 'danger'} role="alert">{t(errorKey === 'conflict' ? 'cookingConflict' : errorKey === 'ambiguous' ? 'cookingAmbiguous' : errorKey === 'journal' ? 'cookingJournalError' : 'cookingSaveError')} <Button size="sm" variant="outline-secondary" onClick={() => void refreshRun()}>{t('refresh')}</Button></Alert>}
     {pendingRecovery && <Alert variant="warning">{t('cookingRetryExact')} <Button size="sm" variant="outline-secondary" disabled={busy} onClick={() => void retryPending()}>{t('cookingRetry')}</Button></Alert>}
     {run.order_changes?.length ? <Alert variant="warning">{t('cookingOrderChanged')} {run.order_changes.map((issue, index) => <div key={`${issue.code}-${index}`}>{t('cookingIssueGeneric')}</div>)}</Alert> : null}
 

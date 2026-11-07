@@ -30,15 +30,15 @@ const RecipeCalculator: React.FC<RecipeCalculatorProps> = ({ show, onHide, recip
     setBaseIngredientId(baseOptions.length === 1 ? baseOptions[0].value : null);
     const initialBase = baseOptions.length === 1 ? ingredients.find(item => item.id === baseOptions[0].value) : null;
     setBaseWeight(initialBase ? normalizeMassQuantityToGrams(initialBase.quantity, initialBase.unit) || '' : '');
-    setCalculatedIngredients(ingredients);
+    setCalculatedIngredients(cookingEnabled ? [] : ingredients);
     setServerError(false);
-  }, [recipe?.id]);
+  }, [recipe?.id, cookingEnabled]);
 
   useEffect(() => {
     setLoading(false);
     setServerError(false);
-    setCalculatedIngredients(ingredients);
-  }, [recipe?.id, selectedWorkspaceId, show]);
+    setCalculatedIngredients(cookingEnabled ? [] : ingredients);
+  }, [recipe?.id, selectedWorkspaceId, show, cookingEnabled]);
 
   useEffect(() => {
     if (!recipe || !baseIngredient || !baseWeight || cookingEnabled) return;

@@ -631,6 +631,7 @@
   "cookingConflict": "Data changed on the server. Your form is still here; refresh the latest data before saving again.",
   "cookingAmbiguous": "The request outcome is unclear. Keep this form open and retry using the same saved operation.",
   "cookingSaveError": "Could not save this cooking step.",
+  "cookingJournalError": "Your browser could not save this action. No request was sent. Free browser storage and try again.",
   "cookingVersion": "Version {{version}}",
   "cookingOrderChanged": "Order details changed after this plan was created.",
   "cookingActualMeat": "Main ingredient and marinade",
